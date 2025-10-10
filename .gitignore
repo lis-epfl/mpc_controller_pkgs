@@ -1,0 +1,24 @@
+# Generated acados solver code
+/mpc_controller_ros2/c_generated_code/
+
+# Build directories
+build/
+install/
+log/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# IDE files
+.vscode/
+.idea/
+
+# Backup files
+*~
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db

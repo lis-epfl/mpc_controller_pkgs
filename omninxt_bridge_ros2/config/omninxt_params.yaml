@@ -1,0 +1,88 @@
+mpc_controller:
+  ros__parameters:
+    # Controller Configuration
+    controller:
+      type: "RATE"            # Options: "RATE" or "TORQUE"
+      use_direct_torque: false  # If true, send torque/thrust directly to PX4 (no INDI); in the simulation sending a direct torque leads to instability unless we change Ixx = 0.004 and Iyy = 0.0065 and Izz = 0.01 
+      verbose: false
+
+    # Drone Physical Parameters
+    drone:
+      mass: 1.54               # kg (verified from simulation: base_link 2.0 + 4 rotors @ 0.016077 kg each)
+      Ixx: 0.02166                # kg*m^2 (from x500_base inertial)
+      Iyy: 0.02166                # kg*m^2 (from x500_base inertial)
+      Izz: 0.04                 # kg*m^2 (from x500_base inertial)
+      kx: 0.1                   # Drag coefficient X
+      ky: 0.1                   # Drag coefficient Y
+      kz: 0.1                   # Drag coefficient Z
+      kh: 0.0                   # Horizontal drag coupling coefficient
+
+      # Control limits
+      thrust_min: 0.1           # Minimum thrust (N)
+      thrust_max: 26.0         # Maximum thrust (N) - calibrated from hover test at 0.725 command
+      rate_max_xy: 20.0         # Maximum roll/pitch rate (rad/s) - reduced from 20.0 for safety
+      rate_max_z: 2.0           # Maximum yaw rate (rad/s) - increased from 1.0 based on capability
+      torque_max_xy: 20.0        # Maximum roll/pitch torque (N*m) - 2 × (27.93/4) × 0.246
+      torque_max_z: 10.0         # Maximum yaw torque (N*m) - 4 × 0.016 × 6.98e-06 × 1000²
+
+      # Quadrotor geometry and actuator parameters
+      arm_length: 0.255         # Distance from center to motor (m) - sqrt(0.174^2 + 0.174^2)
+      arm_angle_deg: 30.6       # Angle between arms (degrees)
+      rotor_inertia: 1.0e-07  # Rotor inertia Izz (kg*m^2) from rotor link
+      thrust_coefficient: 6.5e-06          # Effective thrust coefficient (calibrated: 27.93 N / (4 × 1000²))
+      torque_coefficient: 3.25e-07         # Torque coefficient (0.05 × thrust_coefficient)
+      max_rotor_rpm: 10103.0     # Maximum rotor speed from SDF (1000 rad/s)
+      esc_scale: 9.54929658551         # ESC rpm measurements are multiplied by rpm to rad/s constant and by this scale as well because simulation doesn't return rpm, but rad/s, so we compensate the rpm to rad/s constant with with scale
+
+    # MPC Configuration
+    mpc:
+      # IMPORTANT: For the number of steps and the total time horizon, these are set in
+      # the python generation code generate_acados_solvers.py and cannot be changed once
+      # the code is generated
+      horizon_decay_factor: 0.0 # Decay of cost over the horizon (last horizon weight would be 1-horizon_decay_factor)
+      horizon_decay_type: "linear" # Decay type: linear or exponential
+      control_frequency: 100.0  # MPC update rate (Hz)
+      computation_delay: 0.003  # Expected computation delay (s)
+
+      # Cost matrices for RATE controller
+      # State weights: [px, py, pz, vx, vy, vz, qw, qx, qy, qz]
+      Q_rate_diag: [100.0, 100.0, 100.0,    # Position weights
+                    1.0, 1.0, 1.0,           # Velocity weights
+                    1.0, 1.0, 1.0, 0.0]      # Quaternion weights
+
+      # Control weights: [thrust, wx, wy, wz]
+      R_rate_diag: [0.1, 1.0, 1.0, 1.0]
+
+      # Cost matrices for TORQUE controller
+      # State weights: [px, py, pz, vx, vy, vz, qw, qx, qy, qz, wx, wy, wz]
+      Q_torque_diag: [100.0, 100.0, 100.0,  # Position weights
+                      1.0, 1.0, 1.0,      # Velocity weights
+                      1.0, 1.0, 1.0, 0.0,    # Quaternion weights
+                      2.0, 2.0, 2.0]      # Angular rate weights
+
+      # Control weights: [thrust, tau_x, tau_y, tau_z]
+      R_torque_diag: [0.1, 10.0, 10.0, 10.0]
+
+    # INDI Configuration (only used when controller.type = "TORQUE" and use_direct_torque = false)
+    indi:
+      frequency: 250.0            # INDI loop frequency (Hz)
+      filter_type: "first_order"  # Options: "butterworth" or "first_order"
+      filter_cutoff_hz: 50.0      # Filter cutoff frequency (Hz)
+
+    # Topic Configuration
+    topics:
+      # Note: PX4 topics are now hardcoded to standard paths, you can remap them if you need other topics:
+      # Subscriptions:
+      #   /fmu/out/vehicle_odometry - Position, velocity, orientation, angular velocity
+      #   /fmu/out/sensor_gyro - Angular velocities
+      #   /fmu/out/esc_status - Motor RPM feedback
+      # Publications:
+      #   /fmu/in/vehicle_rates_setpoint - For RATE control
+      #   /fmu/in/vehicle_torque_setpoint - For direct TORQUE control
+      #   /fmu/in/actuator_motors - For INDI motor control
+      trajectory: "/planner/trajectory"  # Trajectory input topic
+
+    # Logging Configuration
+    logging:
+      enabled: true                    # Auto-start logging
+      directory: "/tmp/mpc_logs"       # Log location

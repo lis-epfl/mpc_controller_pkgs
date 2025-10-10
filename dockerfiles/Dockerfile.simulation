@@ -1,0 +1,66 @@
+# Base image: Official ROS2 Humble Desktop Full (Ubuntu 22.04)
+FROM osrf/ros:humble-desktop-full
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install additional dependencies needed for PX4
+RUN apt-get update && apt-get install -y \
+    git \
+    wget \
+    lsb-release \
+    curl \
+    gnupg2 \
+    build-essential \
+    cmake \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies for PX4
+RUN pip3 install --user -U empy pyros-genmsg setuptools
+
+WORKDIR /root
+
+# Install Micro-XRCE-DDS-Agent
+RUN git clone https://github.com/eProsima/Micro-XRCE-DDS-Agent.git && \
+    cd Micro-XRCE-DDS-Agent && \
+    mkdir build && \
+    cd build && \
+    cmake .. && \
+    make && \
+    make install && \
+    ldconfig
+
+# Clone PX4 Autopilot
+RUN git clone https://github.com/PX4/PX4-Autopilot.git --recursive
+
+# Copy custom DDS topics configuration
+COPY dds_topics.yaml /root/PX4-Autopilot/src/modules/uxrce_dds_client/dds_topics.yaml
+
+# Install older setuptools to prevent build errors
+RUN pip3 install "setuptools<58.0.0"
+
+# Run PX4 setup script
+RUN sed -i '/sudo reboot/d' PX4-Autopilot/Tools/setup/ubuntu.sh && \
+    bash PX4-Autopilot/Tools/setup/ubuntu.sh
+
+# Create and build ROS 2 workspace
+RUN mkdir -p /root/ws_ros2/src
+WORKDIR /root/ws_ros2/src
+RUN git clone https://github.com/PX4/px4_msgs.git
+RUN git clone https://github.com/PX4/px4_ros_com.git
+
+# Build workspace
+SHELL ["/bin/bash", "-c"]
+WORKDIR /root/ws_ros2
+RUN source /opt/ros/humble/setup.bash && \
+    colcon build
+SHELL ["/bin/sh", "-c"]
+
+# Copy entrypoint and startup scripts
+WORKDIR /root
+COPY entrypoint_sim.sh /root/entrypoint.sh
+COPY start_sim.sh /root/start_sim.sh
+RUN chmod +x /root/entrypoint.sh /root/start_sim.sh
+
+ENTRYPOINT ["/root/entrypoint.sh"]
+CMD ["/root/start_sim.sh"]

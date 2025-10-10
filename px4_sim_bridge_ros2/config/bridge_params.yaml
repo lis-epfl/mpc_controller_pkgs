@@ -1,0 +1,13 @@
+px4_sim_bridge_node:
+  ros__parameters:
+    # Auto-arm the vehicle when rate commands are received
+    auto_arm: true
+    
+    # Auto-switch to offboard mode
+    auto_offboard: true
+    
+    # Takeoff altitude in meters (NED frame, so positive is up)
+    takeoff_altitude: 1.0
+    
+    # State machine update rate in Hz
+    state_machine_rate: 20.0

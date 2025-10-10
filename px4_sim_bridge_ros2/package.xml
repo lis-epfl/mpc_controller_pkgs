@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>px4_sim_bridge_ros2</name>
+  <version>0.1.0</version>
+  <description>PX4 simulation bridge for managing arming, takeoff, and offboard mode</description>
+  <maintainer email="charbel.toumieh@epfl.ch"></maintainer>
+  <license>BSD</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>px4_msgs</depend>
+  <depend>std_srvs</depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
