@@ -25,7 +25,6 @@ This package provides a complete MPC controller solution with INDI implementatio
 
 ### For Docker Installation
 - Docker Engine (version 20.10 or higher)
-- Docker Compose (version 2.0 or higher)
 - At least 8GB of available RAM
 - 20GB of free disk space
 
