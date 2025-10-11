@@ -125,7 +125,7 @@ For native installation, follow these steps based on the Docker configuration:
    cd mpc_controller_pkgs
    python3 scripts/generate_acados_solvers.py
    cd ../ 
-   colcon build --symlink-install --packages-select px4_msgs mpc_controller_ros2_msgs mpc_controller_ros2
+   colcon build --symlink-install --packages-select px4_msgs mpc_controller_ros2_msgs mpc_controller_ros2 px4_sim_bridge_ros2
    source install/setup.bash
    ```
 
