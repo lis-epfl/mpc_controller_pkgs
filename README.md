@@ -1,6 +1,6 @@
 # MPC Controller Packages
 
-A ROS2-based Model Predictive Control (MPC) controller implementation with Incremental Nonlinear Dynamic Inversion (INDI) for autonomous vehicle control and trajectory tracking.
+A ROS2-based Model Predictive Control (MPC) controller implementation with Incremental Nonlinear Dynamic Inversion (INDI) for quadrotor trajectory tracking.
 
 ## Table of Contents
 - [Overview](#overview)
