@@ -19,7 +19,7 @@ This package provides a complete MPC controller solution with INDI implementatio
 - Incremental Nonlinear Dynamic Inversion (INDI) for enhanced control
 - Comprehensive simulation environment
 - Trajectory planning and tracking capabilities
-- Real-time performance visualization and analysis tools
+- Performance visualization and analysis tools
 
 ## Prerequisites
 
