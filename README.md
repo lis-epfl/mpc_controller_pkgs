@@ -121,8 +121,12 @@ For native installation, follow these steps based on the Docker configuration:
 
 5. **Build the workspace:**
    ```bash
-   cd ~/mpc_controller_pkgs
-   colcon build --symlink-install
+   cd ~/ros2_ws/src/
+   git clone https://github.com/lis-epfl/mpc_controller_pkgs.git
+   cd mpc_controller_pkgs
+   python3 scripts/generate_acados_solvers.py
+   cd ../ 
+   colcon build --symlink-install --packages-select px4_msgs mpc_controller_ros2_msgs mpc_controller_ros2
    source install/setup.bash
    ```
 
@@ -136,6 +140,7 @@ For options that can be passed to the trajectory publisher and the plotter scrip
 Follow these steps to run the MPC controller with simulation in Docker:
 
 1. **Generate ACADOS solvers:**
+  Necessary after every change to `generate_acados_solvers.py`.
    ```bash
    # First, ensure you're in the project directory
    cd mpc_controller_pkgs
@@ -160,54 +165,52 @@ Follow these steps to run the MPC controller with simulation in Docker:
    docker exec -it ros2_mpc_container bash
    ```
 
-5. **Source the workspace:**
-   Inside the container:
+5. **Run the trajectory publisher:**
    ```bash
    source install/setup.bash
-   ```
-
-6. **Run the trajectory publisher:**
-   ```bash
    cd scripts
    python3 trajectory_publisher.py 
    ```
 
-7. **Visualize results:**
-   After the trajectory is completed:
+6. **Visualize results:**
+   After the trajectory is completed (also could be done during the flight):
    ```bash
    python3 plot_trajectory_data.py 
    ```
+
+To launch the controller alone without the simulation bridge (for the real drone), you can launch `/dockerfiles/launch_mpc.sh`.
 
 ### Native Usage
 
 For native installation:
 
-1. **Source ROS2 and workspace:**
+1. **Generate ACADOS solvers:**
+  Necessary after every change to `generate_acados_solvers.py`.
    ```bash
-   source /opt/ros/humble/setup.bash
-   source ~/mpc_controller_pkgs/install/setup.bash
-   ```
-
-2. **Generate ACADOS solvers:**
-   ```bash
-   cd ~/mpc_controller_pkgs
+   cd mpc_controller_pkgs
    python3 scripts/generate_acados_solvers.py
+   cd ../ 
+   colcon build --symlink-install --packages-select px4_msgs mpc_controller_ros2_msgs mpc_controller_ros2
    ```
 
-3. **Launch the simulation:**
+2. **Launch the simulation from the dockerfile:**
    ```bash
-   ros2 launch mpc_controller simulation.launch.py
+   ./dockerfiles/build_simulation.sh
+   ./dockerfiles/run_simulation.sh
    ```
 
-4. **Launch the MPC controller:**
-   In a new terminal:
+3. **Launch the MPC controller with the drone state controller:**
+   In a new terminal, in your ros2 workspace:
    ```bash
-   ros2 launch mpc_controller mpc_controller.launch.py
+   source install/setup.bash
+   ros2 launch px4_sim_bridge_ros2 sim_with_mpc.launch.py
    ```
 
 5. **Publish trajectories**
+In a new terminal, in your ros2 workspace:
    ```bash
-   cd ~/mpc_controller_pkgs/scripts
+   source install/setup.bash
+   cd src/mpc_controller_pkgs/scripts
    python3 trajectory_publisher.py
    ```
 
@@ -215,3 +218,4 @@ For native installation:
    ```bash
    python3 plot_trajectory_data.py
    ```
+To launch the controller alone without the simulation bridge (for the real drone), you can launch `mpc.launch.py` from the `mpc_controller_ros2` package.
