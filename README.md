@@ -8,9 +8,6 @@ A ROS2-based Model Predictive Control (MPC) controller implementation with Incre
 - [Installation](#installation)
   - [Docker Installation (Recommended)](#docker-installation-recommended)
   - [Native Installation](#native-installation)
-- [Configuration](#configuration)
-  - [MPC Configuration](#mpc-configuration)
-  - [INDI Configuration](#indi-configuration)
 - [Usage](#usage)
   - [Docker Usage with Simulation](#docker-usage-with-simulation)
   - [Native Usage](#native-usage)
@@ -133,68 +130,9 @@ For native installation, follow these steps based on the Docker configuration:
    colcon build --symlink-install
    source install/setup.bash
    ```
-
-## Configuration
-
-### MPC Configuration
-
-The MPC parameters can be configured in `config/mpc_config.yaml`:
-
-```yaml
-mpc:
-  # Prediction horizon
-  prediction_horizon: 50
-  control_horizon: 20
-  
-  # Sampling time
-  dt: 0.02  # seconds
-  
-  # Cost function weights
-  weights:
-    state: [10.0, 10.0, 5.0, 1.0, 1.0, 1.0]  # Position and orientation weights
-    control: [0.1, 0.1, 0.1, 0.1]            # Control input weights
-    terminal: [100.0, 100.0, 50.0, 10.0, 10.0, 10.0]  # Terminal cost weights
-  
-  # Constraints
-  constraints:
-    velocity_max: [5.0, 5.0, 2.0]      # m/s
-    acceleration_max: [2.0, 2.0, 1.0]   # m/s^2
-    angular_velocity_max: [1.0, 1.0, 2.0]  # rad/s
-    
-  # Solver settings
-  solver:
-    max_iterations: 100
-    tolerance: 1e-6
-    qp_solver: 'PARTIAL_CONDENSING_HPIPM'
-```
-
-### INDI Configuration
-
-The INDI parameters can be configured in `config/indi_config.yaml`:
-
-```yaml
-indi:
-  # Control effectiveness matrix
-  control_effectiveness:
-    linear: [1.0, 0.0, 0.0,
-             0.0, 1.0, 0.0,
-             0.0, 0.0, 1.0]
-    angular: [0.1, 0.0, 0.0,
-              0.0, 0.1, 0.0,
-              0.0, 0.0, 0.05]
-  
-  # Filter settings
-  filter:
-    cutoff_frequency: 10.0  # Hz
-    damping_ratio: 0.7
-    
-  # Incremental control limits
-  incremental_limits:
-    linear_acceleration: 3.0   # m/s^2
-    angular_acceleration: 2.0  # rad/s^2
-```
-
 ## Usage
+
+The MPC and INDI parameters can be configured in `config/mpc_config.yaml`.
 
 ### Docker Usage with Simulation
 
