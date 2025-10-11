@@ -58,9 +58,7 @@ SHELL ["/bin/sh", "-c"]
 
 # Copy entrypoint and startup scripts
 WORKDIR /root
-COPY entrypoint_sim.sh /root/entrypoint.sh
 COPY start_sim.sh /root/start_sim.sh
-RUN chmod +x /root/entrypoint.sh /root/start_sim.sh
+RUN chmod +x /root/start_sim.sh
 
-ENTRYPOINT ["/root/entrypoint.sh"]
 CMD ["/root/start_sim.sh"]

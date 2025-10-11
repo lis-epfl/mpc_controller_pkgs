@@ -26,11 +26,6 @@ if [ "$PACKAGES_BUILT" != "yes" ]; then
     echo "✓ Build complete!"
 fi
 
-# Copy latest config and launch files
-echo "Updating config and launch files..."
-docker exec ${CONTAINER_NAME} mkdir -p /root/ws_ros2/src/mpc_controller_pkgs/px4_sim_bridge_ros2/config 2>/dev/null
-docker exec ${CONTAINER_NAME} mkdir -p /root/ws_ros2/src/mpc_controller_pkgs/px4_sim_bridge_ros2/launch 2>/dev/null
-
 # Launch the simulation with MPC
 echo "Launching simulation with MPC..."
 docker exec -it ${CONTAINER_NAME} bash -c "
