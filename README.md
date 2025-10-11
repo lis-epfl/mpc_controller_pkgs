@@ -56,11 +56,6 @@ The Docker installation provides a containerized environment with all dependenci
    ./docker/build_mpc.sh
    ```
 
-3. **Verify the installation:**
-   ```bash
-   docker images | grep ros2_mpc
-   ```
-
 ### Native Installation
 
 For native installation, follow these steps based on the Docker configuration:
