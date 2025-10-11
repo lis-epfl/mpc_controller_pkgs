@@ -129,6 +129,7 @@ For native installation, follow these steps based on the Docker configuration:
 ## Usage
 
 The MPC and INDI parameters can be configured in `config/mpc_config.yaml`.
+For options that can be passed to the trajectory publisher and the plotter scripts, check the arguments inside them. The default trajectory publisher with no arguments will publish a helix.
 
 ### Docker Usage with Simulation
 
@@ -168,13 +169,13 @@ Follow these steps to run the MPC controller with simulation in Docker:
 6. **Run the trajectory publisher:**
    ```bash
    cd scripts
-   python3 trajectory_publisher.py [OPTIONS]
+   python3 trajectory_publisher.py 
    ```
 
 7. **Visualize results:**
    After the trajectory is completed:
    ```bash
-   python3 plot_trajectory_data.py [OPTIONS]
+   python3 plot_trajectory_data.py 
    ```
 
 ### Native Usage
