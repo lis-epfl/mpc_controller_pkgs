@@ -11,11 +11,6 @@ A ROS2-based Model Predictive Control (MPC) controller implementation with Incre
 - [Usage](#usage)
   - [Docker Usage with Simulation](#docker-usage-with-simulation)
   - [Native Usage](#native-usage)
-- [Scripts Documentation](#scripts-documentation)
-  - [Trajectory Publisher](#trajectory-publisher)
-  - [Trajectory Data Plotter](#trajectory-data-plotter)
-- [Troubleshooting](#troubleshooting)
-- [License](#license)
 
 ## Overview
 
@@ -130,6 +125,7 @@ For native installation, follow these steps based on the Docker configuration:
    colcon build --symlink-install
    source install/setup.bash
    ```
+
 ## Usage
 
 The MPC and INDI parameters can be configured in `config/mpc_config.yaml`.
@@ -208,157 +204,13 @@ For native installation:
    ros2 launch mpc_controller mpc_controller.launch.py
    ```
 
-5. **Publish trajectories and visualize:**
+5. **Publish trajectories**
    ```bash
    cd ~/mpc_controller_pkgs/scripts
    python3 trajectory_publisher.py
-   python3 plot_trajectory_data.py
    ```
 
-## Scripts Documentation
-
-### Trajectory Publisher
-
-The `trajectory_publisher.py` script publishes reference trajectories for the MPC controller to track.
-
-**Usage:**
-```bash
-python3 trajectory_publisher.py [OPTIONS]
-```
-
-**Options:**
-- `--trajectory-type` : Type of trajectory to publish
-  - `circle` : Circular trajectory (default)
-  - `figure8` : Figure-8 trajectory
-  - `spiral` : Spiral trajectory
-  - `square` : Square trajectory
-  - `custom` : Load custom trajectory from file
-
-- `--duration` : Duration of trajectory execution in seconds (default: 30)
-
-- `--frequency` : Publishing frequency in Hz (default: 50)
-
-- `--amplitude` : Trajectory amplitude scaling factor (default: 1.0)
-
-- `--speed` : Trajectory speed multiplier (default: 1.0)
-
-- `--custom-file` : Path to custom trajectory CSV file (required when using `custom` type)
-
-- `--visualize` : Enable real-time visualization in RViz2 (default: true)
-
-**Examples:**
-```bash
-# Publish a circular trajectory for 60 seconds
-python3 trajectory_publisher.py --trajectory-type circle --duration 60
-
-# Publish a figure-8 trajectory with doubled amplitude
-python3 trajectory_publisher.py --trajectory-type figure8 --amplitude 2.0
-
-# Load and publish a custom trajectory
-python3 trajectory_publisher.py --trajectory-type custom --custom-file ~/trajectories/my_trajectory.csv
-```
-
-### Trajectory Data Plotter
-
-The `plot_trajectory_data.py` script visualizes the recorded trajectory data and controller performance.
-
-**Usage:**
-```bash
-python3 plot_trajectory_data.py [OPTIONS]
-```
-
-**Options:**
-- `--data-dir` : Directory containing recorded data (default: `../data/trajectories/`)
-
-- `--plot-types` : Types of plots to generate (comma-separated)
-  - `position` : Position tracking plots (default)
-  - `velocity` : Velocity tracking plots
-  - `control` : Control inputs plots
-  - `error` : Tracking error plots
-  - `3d` : 3D trajectory visualization
-  - `all` : Generate all plot types
-
-- `--save-plots` : Save plots to files (default: false)
-
-- `--output-dir` : Directory to save plots (default: `../data/plots/`)
-
-- `--format` : Output format for saved plots [`png`, `pdf`, `svg`] (default: `png`)
-
-- `--comparison` : Compare multiple trajectory files (provide comma-separated filenames)
-
-- `--metrics` : Display performance metrics (RMSE, max error, etc.) (default: true)
-
-**Examples:**
-```bash
-# Plot position and velocity data with metrics
-python3 plot_trajectory_data.py --plot-types position,velocity --metrics
-
-# Generate all plots and save as PDF
-python3 plot_trajectory_data.py --plot-types all --save-plots --format pdf
-
-# Compare multiple trajectory runs
-python3 plot_trajectory_data.py --comparison run1.csv,run2.csv,run3.csv
-
-# Plot 3D trajectory with error analysis
-python3 plot_trajectory_data.py --plot-types 3d,error --save-plots
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **ACADOS solver generation fails:**
-   - Ensure ACADOS environment variables are set correctly
-   - Check that CasADi is properly installed
-   - Verify Python path includes ACADOS interfaces
-
-2. **Docker container fails to start:**
-   - Check Docker daemon is running: `sudo systemctl status docker`
-   - Ensure sufficient disk space and memory
-   - Verify Docker images built successfully
-
-3. **ROS2 nodes not communicating:**
-   - Check ROS2 domain ID: `echo $ROS_DOMAIN_ID`
-   - Verify network configuration in Docker
-   - Ensure all nodes are using the same ROS2 distribution
-
-4. **Performance issues:**
-   - Reduce prediction horizon in MPC configuration
-   - Adjust solver tolerance for faster convergence
-   - Check CPU allocation for Docker containers
-
-### Debug Mode
-
-Enable debug output by setting environment variables:
-```bash
-export MPC_DEBUG=1
-export INDI_DEBUG=1
-export ROS_LOG_LEVEL=debug
-```
-
-### Log Files
-
-Logs are stored in:
-- Docker: `/ros2_ws/logs/`
-- Native: `~/.ros/log/`
-
-## Contributing
-
-Contributions are welcome! Please follow these steps:
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Contact
-
-Laboratory of Intelligent Systems (LIS)  
-École Polytechnique Fédérale de Lausanne (EPFL)  
-Website: https://www.epfl.ch/labs/lis/
-
-For questions and support, please open an issue on the [GitHub repository](https://github.com/lis-epfl/mpc_controller_pkgs/issues).
+6. **Visualize trajectories**
+   ```bash
+   python3 plot_trajectory_data.py
+   ```
