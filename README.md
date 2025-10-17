@@ -126,7 +126,7 @@ For native installation, follow these steps based on the Docker configuration:
 
 ## Usage
 
-The MPC and INDI parameters can be configured in `config/mpc_config.yaml`.
+The MPC and INDI parameters can be configured in `config/mpc_config.yaml`. The horizon and the number of steps for the MPC can only be changed inside `generate_acados_solvers.py` and you need to regenerate the C code everytime you make that change and colcon build the packages (steps below).
 For options that can be passed to the trajectory publisher and the plotter scripts, check the arguments inside them. The default trajectory publisher with no arguments will publish a helix.
 
 ### Docker Usage with Simulation
