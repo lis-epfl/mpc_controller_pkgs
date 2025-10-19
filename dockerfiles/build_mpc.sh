@@ -16,7 +16,7 @@ echo "Detected architecture: $ARCH"
 
 # Set base image based on architecture
 if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
-    BASE_IMAGE="dustynv/ros:humble-desktop-l4t-r35.4.1"
+    BASE_IMAGE="dustynv/ros:humble-desktop-l4t-r36.4.0"
     echo "Using ARM64 base image: $BASE_IMAGE"
 elif [ "$ARCH" = "x86_64" ]; then
     BASE_IMAGE="osrf/ros:humble-desktop-full"
