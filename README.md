@@ -117,56 +117,43 @@ For native installation, follow these steps based on the Docker configuration:
    ```bash
    cd ~/ros2_ws/src/
    git clone https://github.com/lis-epfl/mpc_controller_pkgs.git
-   cd mpc_controller_pkgs
-   python3 scripts/generate_acados_solvers.py
-   cd ../ 
    colcon build --symlink-install --packages-select px4_msgs mpc_controller_ros2_msgs mpc_controller_ros2 px4_sim_bridge_ros2
    source install/setup.bash
    ```
 
 ## Usage
 
-The MPC and INDI parameters can be configured in `config/mpc_config.yaml`. The horizon and the number of steps for the MPC can only be changed inside `generate_acados_solvers.py` and you need to regenerate the C code everytime you make that change and colcon build the packages (steps below).
+The MPC and INDI parameters can be configured in `config/mpc_config.yaml`. The horizon and the number of steps for the MPC can only be changed inside `generate_acados_solvers.py`.
 For options that can be passed to the trajectory publisher and the plotter scripts, check the arguments inside them. The default trajectory publisher with no arguments will publish a helix.
 
 ### Docker Usage with Simulation
 
 Follow these steps to run the MPC controller with simulation in Docker:
 
-1. **Generate ACADOS solvers:**
-  Necessary after every change to `generate_acados_solvers.py`.
-   ```bash
-   # First, ensure you're in the project directory
-   cd mpc_controller_pkgs
-   
-   # Run the solver generation script
-   python3 scripts/generate_acados_solvers.py
-   ```
-
-2. **Start the simulation environment:**
+1. **Start the simulation environment:**
    ```bash
    ./docker/run_sim.sh
    ```
 
-3. **Launch the MPC controller:**
+2. **Launch the MPC controller:**
    In a new terminal:
    ```bash
    ./docker/launch_sim_mpc.sh
    ```
 
-4. **Access the container:**
+3. **Access the container:**
    ```bash
    docker exec -it ros2_mpc_container bash
    ```
 
-5. **Run the trajectory publisher:**
+4. **Run the trajectory publisher:**
    ```bash
    source install/setup.bash
    cd scripts
    python3 trajectory_publisher.py 
    ```
 
-6. **Visualize results:**
+5. **Visualize results:**
    After the trajectory is completed (also could be done during the flight):
    ```bash
    python3 plot_trajectory_data.py 
@@ -178,12 +165,9 @@ To launch the controller alone without the simulation bridge (for the real drone
 
 For native installation:
 
-1. **Generate ACADOS solvers:**
+1. **Build package:**
   Necessary after every change to `generate_acados_solvers.py`.
    ```bash
-   cd mpc_controller_pkgs
-   python3 scripts/generate_acados_solvers.py
-   cd ../ 
    colcon build --symlink-install --packages-select px4_msgs mpc_controller_ros2_msgs mpc_controller_ros2
    ```
 

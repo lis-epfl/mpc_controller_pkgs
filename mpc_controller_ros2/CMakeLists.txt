@@ -8,6 +8,17 @@ endif()
 # add_compile_options(-g) # compile options for debugging
 add_compile_options(-O3) # compile options for max optimization
 
+# Check if solvers have been generated
+execute_process(
+  COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/scripts/generate_acados_solvers.py
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/scripts
+  RESULT_VARIABLE return_code
+)
+
+if(NOT return_code EQUAL 0)
+  message(FATAL_ERROR "Failed to generate acados solvers. See output above for details.")
+endif()
+
 # Find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -66,18 +77,6 @@ set(C_CODE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/c_generated_code)
 set(ACADOS_SOLVER_RATE_DIR ${C_CODE_DIR}/quadrotor_rate)
 set(ACADOS_SOLVER_TORQUE_DIR ${C_CODE_DIR}/quadrotor_torque)
 
-# Check if solvers have been generated
-if(NOT EXISTS ${ACADOS_SOLVER_RATE_DIR} OR NOT EXISTS ${ACADOS_SOLVER_TORQUE_DIR})
-  message(FATAL_ERROR
-    "=================================================================\n"
-    "  ERROR: Generated acados solver code not found!\n"
-    "  \n"
-    "  Please generate the solvers first by running:\n"
-    "    cd ${CMAKE_CURRENT_SOURCE_DIR}/scripts\n"
-    "    python3 generate_acados_solvers.py\n"
-    "  \n"
-    "=================================================================")
-endif()
 
 message(STATUS "Found generated acados solvers:")
 message(STATUS "  Rate solver: ${ACADOS_SOLVER_RATE_DIR}")
