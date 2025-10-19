@@ -1,78 +1,155 @@
 #!/bin/bash
-
 # launch_mpc.sh
-# Fixed version - no redundant copying, smart rebuilding
+# Development version with automatic Tera renderer setup
 
 CONTAINER_NAME="ros2_mpc_container"
 
-# Check if container is running, start if needed
+# Color codes for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+echo -e "${GREEN}MPC Controller Development Launcher${NC}"
+echo "This script ensures all changes are picked up"
+echo ""
+
+# Check if container is running
 if [ ! "$(docker ps -q -f name=^${CONTAINER_NAME}$)" ]; then
-    echo "Container ${CONTAINER_NAME} is not running. Starting it first..."
+    echo -e "${YELLOW}Starting container...${NC}"
     ./run_mpc.sh
     sleep 3
-
-    # Verify it started
-    if [ ! "$(docker ps -q -f name=^${CONTAINER_NAME}$)" ]; then
-        echo "Error: Failed to start container ${CONTAINER_NAME}"
-        echo "Check: docker logs ${CONTAINER_NAME}"
-        exit 1
-    fi
 fi
 
-# Check and build workspace
-echo "Checking workspace and building if needed..."
+# Ensure Tera renderer is installed
+echo -e "${BLUE}Checking Tera renderer installation...${NC}"
 docker exec ${CONTAINER_NAME} bash -c '
-    source /opt/ros/humble/setup.bash
-    cd /root/ws_ros2
-
-    # Check if this is first build or incremental
-    if [ ! -d "install" ]; then
-        echo "First time build - this will take ~45 seconds..."
-        colcon build
-        echo "✓ Initial build complete!"
+    # Check if tera renderer already exists
+    if [ -f "/opt/acados/bin/t_renderer" ]; then
+        echo "  ✓ Tera renderer already installed"
     else
-        # Only rebuild packages that changed
-        echo "Checking for changes..."
-        OUTPUT=$(colcon build --packages-skip-build-finished 2>&1)
+        echo "  Installing Tera renderer..."
 
-        # Check if anything was actually built
-        if echo "$OUTPUT" | grep -q "Starting >>>"; then
-            echo "$OUTPUT" | grep "Starting >>>" | sed "s/Starting >>> /  Building: /"
-            echo "✓ Build complete!"
-        elif echo "$OUTPUT" | grep -q "All selected packages are already built"; then
-            echo "✓ No changes detected, skipping build"
+        # Create directory if it doesnt exist
+        mkdir -p /opt/acados/bin
+
+        # Download the tera renderer for Linux x86_64
+        cd /tmp
+        wget -q https://github.com/acados/tera_renderer/releases/download/v0.0.34/t_renderer-v0.0.34-linux \
+             -O t_renderer
+
+        if [ $? -eq 0 ]; then
+            # Make executable and move to acados bin
+            chmod +x t_renderer
+            mv t_renderer /opt/acados/bin/
+            echo "  ✓ Tera renderer installed successfully"
         else
-            # Show output if something unexpected happened
-            echo "$OUTPUT"
+            echo "  ✗ Failed to download Tera renderer"
+            echo "  Please install manually from: https://github.com/acados/tera_renderer/releases"
+            exit 1
         fi
     fi
 '
 
-# Verify packages are available before launching
-echo "Verifying packages..."
-PACKAGES_OK=$(docker exec ${CONTAINER_NAME} bash -c "
-    source /opt/ros/humble/setup.bash 2>/dev/null
-    source /root/ws_ros2/install/setup.bash 2>/dev/null
-    ros2 pkg list 2>/dev/null | grep -q mpc_controller_ros2 && echo 'yes' || echo 'no'
-" 2>/dev/null)
+# Check if acados solver generation is needed
+echo -e "${BLUE}Checking if acados solver regeneration is needed...${NC}"
+docker exec ${CONTAINER_NAME} bash -c '
+    source /opt/ros/humble/setup.bash
+    cd /root/ws_ros2
 
-if [ "$PACKAGES_OK" != "yes" ]; then
-    echo "Error: mpc_controller_ros2 package not found!"
-    echo "Trying to diagnose..."
-    docker exec ${CONTAINER_NAME} bash -c "
-        echo 'Packages in workspace:'
-        ls -la /root/ws_ros2/src/mpc_controller_pkgs/ 2>/dev/null || echo 'Mount not found!'
-        echo ''
-        echo 'Built packages:'
-        source /opt/ros/humble/setup.bash 2>/dev/null
-        source /root/ws_ros2/install/setup.bash 2>/dev/null
-        ros2 pkg list 2>/dev/null | grep -E '(mpc_controller|px4|omninxt)' || echo 'None found'
-    "
-    exit 1
-fi
+    # Define paths
+    SOLVER_SCRIPT="src/mpc_controller_pkgs/mpc_controller_ros2/scripts/generate_acados_solvers.py"
+    CHECKSUM_FILE="/root/ws_ros2/.acados_generation_checksum"
 
-# Launch the MPC controller
-echo "Launching MPC controller..."
+    # List of files that should trigger regeneration when changed
+    WATCH_PATTERN="src/mpc_controller_pkgs/mpc_controller_ros2/scripts/*.py"
+
+    # Calculate current checksum of all relevant Python files
+    CURRENT_CHECKSUM=""
+    if ls $WATCH_PATTERN 1> /dev/null 2>&1; then
+        CURRENT_CHECKSUM=$(find src/mpc_controller_pkgs/mpc_controller_ros2/scripts -name "*.py" -type f -exec md5sum {} \; | sort | md5sum | cut -d" " -f1)
+    fi
+
+    # Check if we need to regenerate
+    REGENERATE=false
+
+    if [ ! -f "$CHECKSUM_FILE" ]; then
+        echo "  No previous generation checksum found - will generate"
+        REGENERATE=true
+    elif [ -z "$CURRENT_CHECKSUM" ]; then
+        echo "  No Python files found - skipping generation"
+    else
+        # Get the stored checksum
+        STORED_CHECKSUM=$(cat "$CHECKSUM_FILE" 2>/dev/null)
+
+        if [ "$CURRENT_CHECKSUM" != "$STORED_CHECKSUM" ]; then
+            echo "  Changes detected (checksum mismatch) - will regenerate"
+            echo "    Previous: ${STORED_CHECKSUM:0:8}..."
+            echo "    Current:  ${CURRENT_CHECKSUM:0:8}..."
+            REGENERATE=true
+        else
+            echo "  No changes detected (checksum match) - skipping generation"
+        fi
+    fi
+
+    # Generate acados solvers if needed
+    if [ "$REGENERATE" = true ]; then
+        echo "Generating acados solvers..."
+        if python3 $SOLVER_SCRIPT; then
+            # Update checksum file
+            echo "$CURRENT_CHECKSUM" > "$CHECKSUM_FILE"
+            echo "✓ Acados solvers generated successfully"
+        else
+            echo "✗ Failed to generate acados solvers"
+            exit 1
+        fi
+    else
+        echo "✓ Using existing acados solvers"
+    fi
+'
+
+# Fix symlink issues for message packages
+echo -e "${BLUE}Checking for symlink conflicts...${NC}"
+docker exec ${CONTAINER_NAME} bash -c '
+    cd /root/ws_ros2
+
+    # Check and fix mpc_controller_ros2_msgs symlink issue
+    PROBLEM_PATH="build/mpc_controller_ros2_msgs/ament_cmake_python/mpc_controller_ros2_msgs/mpc_controller_ros2_msgs"
+    if [ -d "$PROBLEM_PATH" ] && [ ! -L "$PROBLEM_PATH" ]; then
+        echo "  Found directory conflict in mpc_controller_ros2_msgs - cleaning..."
+        rm -rf build/mpc_controller_ros2_msgs install/mpc_controller_ros2_msgs
+        echo "  ✓ Cleaned mpc_controller_ros2_msgs"
+    fi
+
+    # Check and fix px4_msgs if needed
+    PX4_PROBLEM_PATH="build/px4_msgs/ament_cmake_python/px4_msgs/px4_msgs"
+    if [ -d "$PX4_PROBLEM_PATH" ] && [ ! -L "$PX4_PROBLEM_PATH" ]; then
+        echo "  Found directory conflict in px4_msgs - cleaning..."
+        rm -rf build/px4_msgs install/px4_msgs
+        echo "  ✓ Cleaned px4_msgs"
+    fi
+'
+
+# Build all packages
+echo -e "${GREEN}Building packages...${NC}"
+docker exec ${CONTAINER_NAME} bash -c '
+    source /opt/ros/humble/setup.bash
+    cd /root/ws_ros2
+
+    # Build message packages first (they are dependencies)
+    echo "Building message packages..."
+    colcon build --symlink-install --packages-select px4_msgs mpc_controller_ros2_msgs
+
+    # Then build the main package
+    echo "Building MPC controller package..."
+    colcon build --symlink-install --packages-select mpc_controller_ros2
+
+    echo "✓ Build complete!"
+'
+
+# Launch
+echo -e "${GREEN}Launching MPC controller...${NC}"
 docker exec -it ${CONTAINER_NAME} bash -c "
     source /opt/ros/humble/setup.bash && \
     source /root/ws_ros2/install/setup.bash && \

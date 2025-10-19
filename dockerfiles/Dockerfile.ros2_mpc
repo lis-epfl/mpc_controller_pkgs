@@ -56,7 +56,7 @@ ENV LD_LIBRARY_PATH=/opt/acados/lib
 ENV PYTHONPATH=/opt/acados/interfaces/acados_template
 
 # Install acados_template Python interface dependencies
-RUN pip3 install "numpy<2" scipy matplotlib pyyaml pandas
+RUN pip3 install "numpy>=1.17.3,<1.25.0" scipy matplotlib pyyaml pandas
 
 # Install acados_template Python interface
 RUN cd /opt/acados/interfaces/acados_template && \
