@@ -22,36 +22,6 @@ if [ ! "$(docker ps -q -f name=^${CONTAINER_NAME}$)" ]; then
     sleep 3
 fi
 
-# Ensure Tera renderer is installed
-echo -e "${BLUE}Checking Tera renderer installation...${NC}"
-docker exec ${CONTAINER_NAME} bash -c '
-    # Check if tera renderer already exists
-    if [ -f "/opt/acados/bin/t_renderer" ]; then
-        echo "  ✓ Tera renderer already installed"
-    else
-        echo "  Installing Tera renderer..."
-
-        # Create directory if it doesnt exist
-        mkdir -p /opt/acados/bin
-
-        # Download the tera renderer for Linux x86_64
-        cd /tmp
-        wget -q https://github.com/acados/tera_renderer/releases/download/v0.0.34/t_renderer-v0.0.34-linux \
-             -O t_renderer
-
-        if [ $? -eq 0 ]; then
-            # Make executable and move to acados bin
-            chmod +x t_renderer
-            mv t_renderer /opt/acados/bin/
-            echo "  ✓ Tera renderer installed successfully"
-        else
-            echo "  ✗ Failed to download Tera renderer"
-            echo "  Please install manually from: https://github.com/acados/tera_renderer/releases"
-            exit 1
-        fi
-    fi
-'
-
 # Check if acados solver generation is needed
 echo -e "${BLUE}Checking if acados solver regeneration is needed...${NC}"
 docker exec ${CONTAINER_NAME} bash -c '
@@ -106,28 +76,6 @@ docker exec ${CONTAINER_NAME} bash -c '
         fi
     else
         echo "✓ Using existing acados solvers"
-    fi
-'
-
-# Fix symlink issues for message packages
-echo -e "${BLUE}Checking for symlink conflicts...${NC}"
-docker exec ${CONTAINER_NAME} bash -c '
-    cd /root/ws_ros2
-
-    # Check and fix mpc_controller_ros2_msgs symlink issue
-    PROBLEM_PATH="build/mpc_controller_ros2_msgs/ament_cmake_python/mpc_controller_ros2_msgs/mpc_controller_ros2_msgs"
-    if [ -d "$PROBLEM_PATH" ] && [ ! -L "$PROBLEM_PATH" ]; then
-        echo "  Found directory conflict in mpc_controller_ros2_msgs - cleaning..."
-        rm -rf build/mpc_controller_ros2_msgs install/mpc_controller_ros2_msgs
-        echo "  ✓ Cleaned mpc_controller_ros2_msgs"
-    fi
-
-    # Check and fix px4_msgs if needed
-    PX4_PROBLEM_PATH="build/px4_msgs/ament_cmake_python/px4_msgs/px4_msgs"
-    if [ -d "$PX4_PROBLEM_PATH" ] && [ ! -L "$PX4_PROBLEM_PATH" ]; then
-        echo "  Found directory conflict in px4_msgs - cleaning..."
-        rm -rf build/px4_msgs install/px4_msgs
-        echo "  ✓ Cleaned px4_msgs"
     fi
 '
 

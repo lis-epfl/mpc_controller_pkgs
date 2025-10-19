@@ -22,36 +22,6 @@ if [ ! "$(docker ps -q -f name=^${CONTAINER_NAME}$)" ]; then
     sleep 3
 fi
 
-# Ensure Tera renderer is installed
-echo -e "${BLUE}Checking Tera renderer installation...${NC}"
-docker exec ${CONTAINER_NAME} bash -c '
-    # Check if tera renderer already exists
-    if [ -f "/opt/acados/bin/t_renderer" ]; then
-        echo "  ✓ Tera renderer already installed"
-    else
-        echo "  Installing Tera renderer..."
-
-        # Create directory if it doesnt exist
-        mkdir -p /opt/acados/bin
-
-        # Download the tera renderer for Linux x86_64
-        cd /tmp
-        wget -q https://github.com/acados/tera_renderer/releases/download/v0.0.34/t_renderer-v0.0.34-linux \
-             -O t_renderer
-
-        if [ $? -eq 0 ]; then
-            # Make executable and move to acados bin
-            chmod +x t_renderer
-            mv t_renderer /opt/acados/bin/
-            echo "  ✓ Tera renderer installed successfully"
-        else
-            echo "  ✗ Failed to download Tera renderer"
-            echo "  Please install manually from: https://github.com/acados/tera_renderer/releases"
-            exit 1
-        fi
-    fi
-'
-
 # Check if acados solver generation is needed
 echo -e "${BLUE}Checking if acados solver regeneration is needed...${NC}"
 docker exec ${CONTAINER_NAME} bash -c '
