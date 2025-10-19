@@ -25,7 +25,12 @@ fi
 # Check if acados solver generation is needed
 echo -e "${BLUE}Checking if acados solver regeneration is needed...${NC}"
 docker exec ${CONTAINER_NAME} bash -c '
-    source /opt/ros/humble/setup.bash
+    if [ -f "/opt/ros/humble/install/setup.bash" ]; then
+        source /opt/ros/humble/install/setup.bash
+    elif [ -f "/opt/ros/humble/setup.bash" ]; then
+        source /opt/ros/humble/setup.bash
+    fi
+
     cd /root/ws_ros2
 
     # Define paths
@@ -49,6 +54,8 @@ docker exec ${CONTAINER_NAME} bash -c '
         REGENERATE=true
     elif [ -z "$CURRENT_CHECKSUM" ]; then
         echo "  No Python files found - skipping generation"
+    fi
+
     else
         # Get the stored checksum
         STORED_CHECKSUM=$(cat "$CHECKSUM_FILE" 2>/dev/null)
@@ -82,7 +89,12 @@ docker exec ${CONTAINER_NAME} bash -c '
 # Build all packages
 echo -e "${GREEN}Building packages...${NC}"
 docker exec ${CONTAINER_NAME} bash -c '
-    source /opt/ros/humble/setup.bash
+    if [ -f "/opt/ros/humble/install/setup.bash" ]; then
+        source /opt/ros/humble/install/setup.bash
+    elif [ -f "/opt/ros/humble/setup.bash" ]; then
+        source /opt/ros/humble/setup.bash
+    fi
+
     cd /root/ws_ros2
 
     # Build message packages first (they are dependencies)
@@ -98,7 +110,12 @@ docker exec ${CONTAINER_NAME} bash -c '
 
 # Launch the simulation with MPC
 echo -e "${GREEN}Launching simulation with MPC...${NC}"
-docker exec -it ${CONTAINER_NAME} bash -c "
-    source /opt/ros/humble/setup.bash && \
+docker exec -it ${CONTAINER_NAME} bash -c '
+    if [ -f "/opt/ros/humble/install/setup.bash" ]; then
+        source /opt/ros/humble/install/setup.bash
+    elif [ -f "/opt/ros/humble/setup.bash" ]; then
+        source /opt/ros/humble/setup.bash
+    fi
+
     source /root/ws_ros2/install/setup.bash && \
-    ros2 launch px4_sim_bridge_ros2 sim_with_mpc.launch.py"
+    ros2 launch px4_sim_bridge_ros2 sim_with_mpc.launch.py'
