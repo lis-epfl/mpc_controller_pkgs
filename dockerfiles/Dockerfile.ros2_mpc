@@ -62,7 +62,7 @@ ENV LD_LIBRARY_PATH=/opt/acados/lib
 ENV PYTHONPATH=/opt/acados/interfaces/acados_template
 
 # Install acados_template Python interface dependencies
-RUN pip3 install "numpy==1.24.4" "scipy==1.8.0" "matplotlib==3.5.1" "pyyaml==5.4.1" "pandas==2.3.3"
+RUN pip3 install "numpy==1.24.4" "scipy==1.8.0" "matplotlib==3.5.1" "pyyaml==5.4.1" "pandas==2.0.3"
 
 # Install t_renderer for the correct architecture
 RUN mkdir -p /opt/acados/bin && \
