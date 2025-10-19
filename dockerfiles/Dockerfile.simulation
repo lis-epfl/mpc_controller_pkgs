@@ -1,5 +1,6 @@
-# Base image: Official ROS2 Humble Desktop Full (Ubuntu 22.04)
-FROM osrf/ros:humble-desktop-full
+# Accept base image as build argument
+ARG BASE_IMAGE=osrf/ros:humble-desktop-full
+FROM ${BASE_IMAGE}
 
 ENV DEBIAN_FRONTEND=noninteractive
 

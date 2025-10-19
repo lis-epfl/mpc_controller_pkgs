@@ -1,5 +1,6 @@
-# Base image: Official ROS2 Humble Desktop Full (Ubuntu 22.04)
-FROM osrf/ros:humble-desktop-full
+# Accept base image as build argument
+ARG BASE_IMAGE=osrf/ros:humble-desktop-full
+FROM ${BASE_IMAGE}
 
 # Prevent interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
@@ -65,7 +66,6 @@ RUN cd /opt/acados/interfaces/acados_template && \
 # Create ROS2 workspace and clone px4_msgs
 WORKDIR /root/ws_ros2/src
 RUN git clone https://github.com/PX4/px4_msgs.git
-
 WORKDIR /root/ws_ros2
 
 CMD ["/bin/bash"]
