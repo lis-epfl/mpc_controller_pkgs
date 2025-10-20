@@ -64,21 +64,30 @@ ENV PYTHONPATH=/opt/acados/interfaces/acados_template
 # Install acados_template Python interface dependencies
 RUN pip3 install "numpy==1.24.4" "scipy==1.8.0" "matplotlib==3.5.1" "pyyaml==5.3.1" "pandas==2.0.3"
 
-# Install t_renderer for the correct architecture
+# Install t_renderer - build from source for all architectures
 RUN mkdir -p /opt/acados/bin && \
     ARCH=$(uname -m) && \
-    echo "Installing t_renderer for architecture: $ARCH" && \
+    echo "Building t_renderer from source for architecture: $ARCH" && \
+    apt-get update && \
+    apt-get install -y curl build-essential && \
+    # Install Rust using rustup (newer version than apt provides)
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
+    . /root/.cargo/env && \
     cd /tmp && \
-    if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
-        wget -q https://github.com/acados/tera_renderer/releases/download/v0.2.0/t_renderer-v0.2.0-linux-arm64 -O t_renderer || \
-        (echo "Failed to download ARM64 t_renderer" && exit 1); \
-    else \
-        wget -q https://github.com/acados/tera_renderer/releases/download/v0.2.0/t_renderer-v0.2.0-linux-amd64 -O t_renderer || \
-        (echo "Failed to download x86_64 t_renderer" && exit 1); \
-    fi && \
-    chmod +x t_renderer && \
-    mv t_renderer /opt/acados/bin/ && \
-    echo "t_renderer installed successfully"
+    git clone https://github.com/acados/tera_renderer.git && \
+    cd tera_renderer && \
+    git checkout v0.2.0 && \
+    cargo build --release && \
+    cp target/release/t_renderer /opt/acados/bin/ && \
+    chmod +x /opt/acados/bin/t_renderer && \
+    cd /tmp && rm -rf tera_renderer && \
+    # Clean up Rust installation
+    rustup self uninstall -y && \
+    rm -rf /root/.cargo /root/.rustup && \
+    apt-get remove -y curl && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/* && \
+    echo "t_renderer v0.2.0 built successfully from source"
 
 # Install acados_template Python interface
 RUN cd /opt/acados/interfaces/acados_template && \
