@@ -8,10 +8,10 @@ mpc_controller:
 
     # Drone Physical Parameters
     drone:
-      mass: 1.54               # kg (verified from simulation: base_link 2.0 + 4 rotors @ 0.016077 kg each)
-      Ixx: 0.02166                # kg*m^2 (from x500_base inertial)
-      Iyy: 0.02166                # kg*m^2 (from x500_base inertial)
-      Izz: 0.04                 # kg*m^2 (from x500_base inertial)
+      mass: 0.72               # kg (verified from simulation: base_link 2.0 + 4 rotors @ 0.016077 kg each)
+      Ixx: 0.0010                # kg*m^2 (from x500_base inertial)
+      Iyy: 0.0014                # kg*m^2 (from x500_base inertial)
+      Izz: 0.0020                 # kg*m^2 (from x500_base inertial)
       kx: 0.1                   # Drag coefficient X
       ky: 0.1                   # Drag coefficient Y
       kz: 0.1                   # Drag coefficient Z
@@ -19,20 +19,20 @@ mpc_controller:
 
       # Control limits
       thrust_min: 0.1           # Minimum thrust (N)
-      thrust_max: 26.0         # Maximum thrust (N) - calibrated from hover test at 0.725 command
-      rate_max_xy: 20.0         # Maximum roll/pitch rate (rad/s) - reduced from 20.0 for safety
+      thrust_max: 17.14         # Maximum thrust (N) - calibrated from hover test at 0.725 command
+      rate_max_xy: 17.14         # Maximum roll/pitch rate (rad/s) - reduced from 20.0 for safety
       rate_max_z: 2.0           # Maximum yaw rate (rad/s) - increased from 1.0 based on capability
       torque_max_xy: 20.0        # Maximum roll/pitch torque (N*m) - 2 × (27.93/4) × 0.246
       torque_max_z: 10.0         # Maximum yaw torque (N*m) - 4 × 0.016 × 6.98e-06 × 1000²
 
       # Quadrotor geometry and actuator parameters
-      arm_length: 0.255         # Distance from center to motor (m) - sqrt(0.174^2 + 0.174^2)
-      arm_angle_deg: 30.6       # Angle between arms (degrees)
+      arm_length: 0.0756         # Distance from center to motor (m) - sqrt(0.174^2 + 0.174^2)
+      arm_angle_deg: 45       # Angle between arms (degrees)
       rotor_inertia: 1.0e-07  # Rotor inertia Izz (kg*m^2) from rotor link
-      thrust_coefficient: 6.5e-06          # Effective thrust coefficient (calibrated: 27.93 N / (4 × 1000²))
-      torque_coefficient: 3.25e-07         # Torque coefficient (0.05 × thrust_coefficient)
-      max_rotor_rpm: 10103.0     # Maximum rotor speed from SDF (1000 rad/s)
-      esc_scale: 9.54929658551         # ESC rpm measurements are multiplied by rpm to rad/s constant and by this scale as well because simulation doesn't return rpm, but rad/s, so we compensate the rpm to rad/s constant with with scale
+      thrust_coefficient: 2.5e-06          # Effective thrust coefficient 
+      torque_coefficient: 2.5e-07         # Torque coefficient (in generat 0.1 × thrust_coefficient)
+      max_rotor_rpm: 2085.0     # Maximum rotor speed in rad/s 
+      esc_scale: 0.0044        # ESC rpm measurements are multiplied by rpm to rad/s constant and by this scale as well because simulation doesn't return rpm, but rad/s, so we compensate the rpm to rad/s constant with with scale
 
     # MPC Configuration
     mpc:
