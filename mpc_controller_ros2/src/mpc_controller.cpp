@@ -79,6 +79,17 @@ MpcController::MpcController(const rclcpp::NodeOptions &options)
   trajectory_pub_ =
       this->create_publisher<nav_msgs::msg::Path>("~/mpc_trajectory", qos);
 
+  // Add service servers (after publishers are created)
+  enable_service_ = this->create_service<std_srvs::srv::Trigger>(
+      "~/enable_controller",
+      std::bind(&MpcController::enableControllerCallback, this,
+                std::placeholders::_1, std::placeholders::_2));
+
+  disable_service_ = this->create_service<std_srvs::srv::Trigger>(
+      "~/disable_controller",
+      std::bind(&MpcController::disableControllerCallback, this,
+                std::placeholders::_1, std::placeholders::_2));
+
   // Timer for the MPC outer loop
   mpc_timer_ = this->create_wall_timer(
       std::chrono::milliseconds(static_cast<int>(1000.0 / control_freq_)),
@@ -106,6 +117,8 @@ MpcController::MpcController(const rclcpp::NodeOptions &options)
               "MPC Controller Node initialized with direct PX4 interface");
   RCLCPP_INFO(this->get_logger(), "Controller type: %s",
               controller_type_.c_str());
+  RCLCPP_INFO(this->get_logger(), "Controller initially %s",
+              controller_enabled_ ? "ENABLED" : "DISABLED");
   RCLCPP_INFO(this->get_logger(), "MPC Frequency: %.1f Hz", control_freq_);
 
   if (controller_type_ == "TORQUE") {
@@ -133,6 +146,76 @@ MpcController::~MpcController() {
   if (enable_logging_ && trajectory_logger_) {
     trajectory_logger_->stopLogging();
   }
+}
+
+void MpcController::enableControllerCallback(
+    const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+    std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
+  (void)request; // Unused parameter
+
+  std::lock_guard<std::mutex> lock(controller_enabled_mutex_);
+
+  controller_enabled_ = true;
+
+  // Reset controller state for smooth startup
+  solver_->reset();
+  solver_failure_count_ = 0;
+
+  // Clear initial position to use current position when enabled
+  x_init_.clear();
+
+  // Reset INDI filters if using INDI
+  if (controller_type_ == "TORQUE" && !use_direct_torque_) {
+    filtered_omega_.setZero();
+    prev_filtered_omega_.setZero();
+    std::fill(filtered_rotor_speeds_.begin(), filtered_rotor_speeds_.end(),
+              0.0);
+    std::fill(prev_filtered_rotor_speeds_.begin(),
+              prev_filtered_rotor_speeds_.end(), 0.0);
+
+    // Reset filter states
+    for (auto &state : omega_butter_states_) {
+      state.x_prev = state.x_prev2 = state.y_prev = state.y_prev2 = 0.0;
+    }
+    for (auto &state : rotor_butter_states_) {
+      state.x_prev = state.x_prev2 = state.y_prev = state.y_prev2 = 0.0;
+    }
+
+    last_indi_run_time_ = this->get_clock()->now();
+  }
+
+  response->success = true;
+  response->message = "Controller enabled successfully";
+  RCLCPP_INFO(this->get_logger(), "Controller ENABLED via service");
+
+  // Start logging if enabled
+  if (enable_logging_ && trajectory_logger_) {
+    trajectory_logger_->startNewLog();
+    RCLCPP_INFO(this->get_logger(), "Started new log file: %s",
+                trajectory_logger_->getCurrentLogPath().c_str());
+  }
+}
+}
+
+void MpcController::disableControllerCallback(
+    const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+    std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
+  (void)request; // Unused parameter
+
+  std::lock_guard<std::mutex> lock(controller_enabled_mutex_);
+
+  controller_enabled_ = false;
+
+  response->success = true;
+  response->message = "Controller disabled successfully";
+  RCLCPP_WARN(this->get_logger(), "Controller DISABLED via service");
+
+  // Stop logging if enabled
+  if (enable_logging_ && trajectory_logger_) {
+    trajectory_logger_->stopLogging();
+    RCLCPP_INFO(this->get_logger(), "Stopped logging");
+  }
+}
 }
 
 void MpcController::printTimingStatistics(const std::string &name,
@@ -198,6 +281,7 @@ void MpcController::declareAndLoadParams() {
   // Controller parameters
   this->declare_parameter<std::string>("controller.type", "RATE");
   this->declare_parameter<bool>("controller.use_direct_torque", false);
+  this->declare_parameter<bool>("controller.enabled", false);
   this->declare_parameter<bool>("controller.verbose", false);
   this->declare_parameter<double>("indi.frequency", 300.0);
 
@@ -256,6 +340,7 @@ void MpcController::declareAndLoadParams() {
   // Load all parameters
   this->get_parameter("controller.type", controller_type_);
   this->get_parameter("controller.use_direct_torque", use_direct_torque_);
+  this->get_parameter("controller.enabled", controller_enabled_);
   this->get_parameter("controller.verbose", verbose_);
   this->get_parameter("indi.frequency", indi_freq_);
   this->get_parameter("mpc.horizon_decay_factor", horizon_decay_factor_);
@@ -752,6 +837,13 @@ void MpcController::publishMPCTrajectory() {
 }
 
 void MpcController::mpcControlLoop() {
+  {
+    std::lock_guard<std::mutex> lock(controller_enabled_mutex_);
+    if (!controller_enabled_) {
+      return;
+    }
+  }
+
   auto start_time = std::chrono::high_resolution_clock::now();
 
   static int mpc_call_count = 0;
@@ -808,16 +900,16 @@ void MpcController::mpcControlLoop() {
                               time_since_trajectory_start;
         std::vector<double> ref_point = interpolateReference(horizon_time);
 
-        if (ref_point.empty()) {
-          // If interpolation fails, fall back to position hold
+        if (ref_point.empty()) { // If interpolation fails, fall back to
+                                 // position hold
           ref_point.resize(10, 0.0);
           ref_point[0] = x_current_local[0]; // Hold current position
           ref_point[1] = x_current_local[1];
           ref_point[2] = x_current_local[2];
-          ref_point[6] = x_current_local[6]; // qw
-          ref_point[7] = x_current_local[7]; // qx
-          ref_point[8] = x_current_local[8]; // qy
-          ref_point[9] = x_current_local[9]; // qz
+          ref_point[6] = 1.0; // qw
+          ref_point[7] = 0.0; // qx
+          ref_point[8] = 0.0; // qy
+          ref_point[9] = 0.0; // qz
         }
 
         horizon_references.push_back(ref_point);
@@ -827,16 +919,22 @@ void MpcController::mpcControlLoop() {
       terminal_reference = horizon_references.back();
 
     } else {
-      // No trajectory - hold current position
+      // No trajectory - hold initial position
+      if (x_init_.empty()) {
+        x_init_.resize(3, 0.0);
+        x_init_[0] = x_current_local[0];
+        x_init_[1] = x_current_local[1];
+        x_init_[2] = x_current_local[2];
+      }
       for (int i = 0; i <= n_; ++i) {
         std::vector<double> ref_point(10, 0.0);
-        ref_point[0] = 0.0; // x_current_local[0]; // Hold current x
-        ref_point[1] = 0.0; // x_current_local[1]; // Hold current y
-        ref_point[2] = 1.0; // x_current_local[2]; // Hold current z
-        ref_point[6] = x_current_local[6]; // qw
-        ref_point[7] = x_current_local[7]; // qx
-        ref_point[8] = x_current_local[8]; // qy
-        ref_point[9] = x_current_local[9]; // qz
+        ref_point[0] = x_init_[0];
+        ref_point[1] = x_init_[1];
+        ref_point[2] = x_init_[2];
+        ref_point[6] = 0.0; // qw
+        ref_point[7] = 0.0; // qx
+        ref_point[8] = 0.0; // qy
+        ref_point[9] = 0.0; // qz
 
         horizon_references.push_back(ref_point);
       }
@@ -1020,6 +1118,13 @@ void MpcController::mpcControlLoop() {
 std::vector<double>
 MpcController::runIndiController(double mpc_thrust,
                                  const Eigen::Vector3d &mpc_torques) {
+  {
+    std::lock_guard<std::mutex> lock(controller_enabled_mutex_);
+    if (!controller_enabled_) {
+      return;
+    }
+  }
+
   rclcpp::Time now = this->get_clock()->now();
   double dt = (now - last_indi_run_time_).seconds();
   if (dt < TINY_DT) {

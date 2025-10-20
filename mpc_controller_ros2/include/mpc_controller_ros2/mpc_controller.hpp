@@ -61,6 +61,14 @@ private:
   void gyroCallback(px4_msgs::msg::SensorGyro::UniquePtr msg);
   void escStatusCallback(px4_msgs::msg::EscStatus::UniquePtr msg);
 
+  // Service callbacks
+  void enableControllerCallback(
+      const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+      std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  void disableControllerCallback(
+      const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+      std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+
   // Helper methods
   void publishRateCommand(double thrust, double wx, double wy, double wz);
   void publishTorqueCommand(double thrust, double tau_x, double tau_y,
@@ -92,6 +100,11 @@ private:
   rclcpp::Publisher<px4_msgs::msg::ActuatorMotors>::SharedPtr motors_pub_;
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr trajectory_pub_;
 
+  // Service servers
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr enable_service_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr disable_service_;
+
+  // timers
   rclcpp::TimerBase::SharedPtr mpc_timer_;
   rclcpp::TimerBase::SharedPtr indi_timer_;
 
@@ -101,6 +114,7 @@ private:
   // Parameters
   std::string controller_type_, indi_filter_type_;
   bool use_direct_torque_; // If true, send torque/thrust directly (no INDI)
+  bool controller_enabled_;
   bool verbose_;
   int n_;
   double control_freq_, indi_freq_;
@@ -123,6 +137,7 @@ private:
   // Thread-safe state (shared between ROS callbacks, MPC, and INDI loops)
   std::mutex state_mutex_;
   std::mutex trajectory_mutex_;
+  std::mutex controller_enabled_mutex_;
   bool pose_received_ = false;
   bool trajectory_received_ = false;
   std::vector<double> current_state_;
@@ -139,6 +154,7 @@ private:
   // Controller state
   std::vector<double> predicted_state_cache_;
   std::vector<double> last_control_input_;
+  std::vector<double> x_init_;
   std::vector<std::vector<double>> ref_trajectory_;
   rclcpp::Time trajectory_start_time_;
   double trajectory_dt_ = 0.1;

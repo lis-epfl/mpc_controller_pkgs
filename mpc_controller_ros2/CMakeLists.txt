@@ -17,6 +17,7 @@ find_package(mpc_controller_ros2_msgs REQUIRED)
 find_package(px4_msgs REQUIRED)  # Only PX4 messages needed now
 find_package(Eigen3 REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 
 # Set ACADOS paths directly based on diagnostic output
 set(ACADOS_SOURCE_DIR "/opt/acados")
@@ -178,6 +179,7 @@ ament_target_dependencies(mpc_controller_node
   mpc_controller_ros2_msgs
   px4_msgs
   nav_msgs
+  std_srvs
 )
 
 # Then link against libraries

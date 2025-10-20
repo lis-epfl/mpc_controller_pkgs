@@ -16,6 +16,7 @@
   <depend>mpc_controller_ros2_msgs</depend>
   <depend>px4_msgs</depend>
   <depend>eigen</depend>
+  <depend>std_srvs</depend>
 
   <!-- Python dependencies for scripts -->
   <exec_depend>rclpy</exec_depend>
