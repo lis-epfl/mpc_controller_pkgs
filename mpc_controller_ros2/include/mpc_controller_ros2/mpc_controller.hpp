@@ -21,6 +21,7 @@
 #include "mpc_controller_ros2_msgs/msg/trajectory.hpp"
 #include "nav_msgs/msg/path.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/bool.hpp"
 
 // PX4 messages
 #include "px4_msgs/msg/actuator_motors.hpp"
@@ -63,12 +64,13 @@ private:
   trajectoryCallback(mpc_controller_ros2_msgs::msg::Trajectory::UniquePtr msg);
   void gyroCallback(px4_msgs::msg::SensorGyro::UniquePtr msg);
   void escStatusCallback(px4_msgs::msg::EscStatus::UniquePtr msg);
+  void enableControllerCallback(const std_msgs::msg::Bool::SharedPtr msg);
 
   // Service callbacks
-  void enableControllerCallback(
+  void enableControllerService(
       const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
       std::shared_ptr<std_srvs::srv::Trigger::Response> response);
-  void disableControllerCallback(
+  void disableControllerService(
       const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
       std::shared_ptr<std_srvs::srv::Trigger::Response> response);
 
@@ -93,6 +95,7 @@ private:
       traj_sub_;
   rclcpp::Subscription<px4_msgs::msg::SensorGyro>::SharedPtr gyro_sub_;
   rclcpp::Subscription<px4_msgs::msg::EscStatus>::SharedPtr esc_status_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr enable_sub_;
 
   // Publishers for PX4 commands
   rclcpp::Publisher<px4_msgs::msg::VehicleRatesSetpoint>::SharedPtr rates_pub_;

@@ -63,6 +63,11 @@ MpcController::MpcController(const rclcpp::NodeOptions &options)
       std::bind(&MpcController::escStatusCallback, this,
                 std::placeholders::_1));
 
+  enable_sub_ = this->create_subscription<std_msgs::msg::Bool>(
+      "~/enable", qos,
+      std::bind(&MpcController::enableControllerCallback, this,
+                std::placeholders::_1));
+
   // Publishers for PX4 commands
   rates_pub_ = this->create_publisher<px4_msgs::msg::VehicleRatesSetpoint>(
       "/fmu/in/vehicle_rates_setpoint", qos);
@@ -82,12 +87,12 @@ MpcController::MpcController(const rclcpp::NodeOptions &options)
   // Add service servers (after publishers are created)
   enable_service_ = this->create_service<std_srvs::srv::Trigger>(
       "~/enable_controller",
-      std::bind(&MpcController::enableControllerCallback, this,
+      std::bind(&MpcController::enableControllerService, this,
                 std::placeholders::_1, std::placeholders::_2));
 
   disable_service_ = this->create_service<std_srvs::srv::Trigger>(
       "~/disable_controller",
-      std::bind(&MpcController::disableControllerCallback, this,
+      std::bind(&MpcController::disableControllerService, this,
                 std::placeholders::_1, std::placeholders::_2));
 
   // Timer for the MPC outer loop
@@ -148,7 +153,7 @@ MpcController::~MpcController() {
   }
 }
 
-void MpcController::enableControllerCallback(
+void MpcController::enableControllerService(
     const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
     std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
   (void)request; // Unused parameter
@@ -161,28 +166,7 @@ void MpcController::enableControllerCallback(
   solver_->reset();
   solver_failure_count_ = 0;
 
-  // Clear initial position to use current position when enabled
-  x_init_.clear();
-
-  // Reset INDI filters if using INDI
-  if (controller_type_ == "TORQUE" && !use_direct_torque_) {
-    filtered_omega_.setZero();
-    prev_filtered_omega_.setZero();
-    std::fill(filtered_rotor_speeds_.begin(), filtered_rotor_speeds_.end(),
-              0.0);
-    std::fill(prev_filtered_rotor_speeds_.begin(),
-              prev_filtered_rotor_speeds_.end(), 0.0);
-
-    // Reset filter states
-    for (auto &state : omega_butter_states_) {
-      state.x_prev = state.x_prev2 = state.y_prev = state.y_prev2 = 0.0;
-    }
-    for (auto &state : rotor_butter_states_) {
-      state.x_prev = state.x_prev2 = state.y_prev = state.y_prev2 = 0.0;
-    }
-
-    last_indi_run_time_ = this->get_clock()->now();
-  }
+  last_indi_run_time_ = this->get_clock()->now();
 
   response->success = true;
   response->message = "Controller enabled successfully";
@@ -196,7 +180,7 @@ void MpcController::enableControllerCallback(
   }
 }
 
-void MpcController::disableControllerCallback(
+void MpcController::disableControllerService(
     const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
     std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
   (void)request; // Unused parameter
@@ -213,6 +197,35 @@ void MpcController::disableControllerCallback(
   if (enable_logging_ && trajectory_logger_) {
     trajectory_logger_->stopLogging();
     RCLCPP_INFO(this->get_logger(), "Stopped logging");
+  }
+}
+
+void MpcController::enableControllerCallback(
+    const std_msgs::msg::Bool::SharedPtr msg) {
+
+  std::lock_guard<std::mutex> lock(controller_enabled_mutex_);
+  if (msg->data) {
+    if (!controller_enabled_) {
+      RCLCPP_INFO(this->get_logger(), "Controller ENABLED via topic");
+      controller_enabled_ = true;
+      last_indi_run_time_ = this->get_clock()->now();
+      // Start logging if enabled
+      if (enable_logging_ && trajectory_logger_) {
+        trajectory_logger_->startNewLog();
+        RCLCPP_INFO(this->get_logger(), "Started new log file: %s",
+                    trajectory_logger_->getCurrentLogPath().c_str());
+      }
+    }
+  } else {
+    if (controller_enabled_) {
+      RCLCPP_WARN(this->get_logger(), "Controller DISABLED via topic");
+      controller_enabled_ = false;
+      // Stop logging if enabled
+      if (enable_logging_ && trajectory_logger_) {
+        trajectory_logger_->stopLogging();
+        RCLCPP_INFO(this->get_logger(), "Stopped logging");
+      }
+    }
   }
 }
 
