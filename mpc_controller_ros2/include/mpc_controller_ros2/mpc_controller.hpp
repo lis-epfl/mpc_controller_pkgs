@@ -14,6 +14,9 @@
 #include "mpc_controller_ros2/mpc_torque_solver.hpp"
 #include "mpc_controller_ros2/trajectory_logger.hpp"
 
+// ROS2 Services
+#include "std_srvs/srv/trigger.hpp"
+
 // ROS and message types
 #include "mpc_controller_ros2_msgs/msg/trajectory.hpp"
 #include "nav_msgs/msg/path.hpp"

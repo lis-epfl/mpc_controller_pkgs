@@ -128,7 +128,7 @@ For options that can be passed to the trajectory publisher and the plotter scrip
 
 ### Docker Usage with Simulation
 
-Follow these steps to run the MPC controller with simulation in Docker:
+For the simulation to work, you need to download and launch [QGroundControl](https://docs.qgroundcontrol.com/master/en/qgc-user-guide/getting_started/download_and_install.html). Follow these steps to run the MPC controller with simulation in Docker:
 
 1. **Start the simulation environment:**
    ```bash
@@ -149,7 +149,7 @@ Follow these steps to run the MPC controller with simulation in Docker:
 4. **Run the trajectory publisher:**
    ```bash
    source install/setup.bash
-   cd /src/mpc_controller_pkgs/mpc_controller_ros2/scripts
+   cd src/mpc_controller_pkgs/mpc_controller_ros2/scripts
    python3 trajectory_publisher.py 
    ```
 

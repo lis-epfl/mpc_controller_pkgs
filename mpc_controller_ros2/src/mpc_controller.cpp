@@ -195,7 +195,6 @@ void MpcController::enableControllerCallback(
                 trajectory_logger_->getCurrentLogPath().c_str());
   }
 }
-}
 
 void MpcController::disableControllerCallback(
     const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
@@ -215,7 +214,6 @@ void MpcController::disableControllerCallback(
     trajectory_logger_->stopLogging();
     RCLCPP_INFO(this->get_logger(), "Stopped logging");
   }
-}
 }
 
 void MpcController::printTimingStatistics(const std::string &name,
@@ -552,6 +550,13 @@ void MpcController::publishMotorCommand(
 }
 
 void MpcController::indiControlLoop() {
+  {
+    std::lock_guard<std::mutex> lock(controller_enabled_mutex_);
+    if (!controller_enabled_) {
+      return;
+    }
+  }
+
   if (!pose_received_) {
     return;
   }
@@ -1118,12 +1123,6 @@ void MpcController::mpcControlLoop() {
 std::vector<double>
 MpcController::runIndiController(double mpc_thrust,
                                  const Eigen::Vector3d &mpc_torques) {
-  {
-    std::lock_guard<std::mutex> lock(controller_enabled_mutex_);
-    if (!controller_enabled_) {
-      return;
-    }
-  }
 
   rclcpp::Time now = this->get_clock()->now();
   double dt = (now - last_indi_run_time_).seconds();
