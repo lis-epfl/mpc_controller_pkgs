@@ -15,7 +15,6 @@ echo -e "${GREEN}MPC Controller Development Launcher${NC}"
 echo "This script ensures all changes are picked up"
 echo ""
 
-# --- ADDED: Handle ROS_DOMAIN_ID from command-line argument ---
 if [ -z "$1" ]; then
     echo -e "${YELLOW}Usage: $0 <ROS_DOMAIN_ID>${NC}"
     echo -e "${YELLOW}No ROS_DOMAIN_ID provided. Using default: 0${NC}"
@@ -24,7 +23,8 @@ else
     ROS_DOMAIN_ID=$1
 fi
 echo -e "${BLUE}Using ROS_DOMAIN_ID: ${ROS_DOMAIN_ID}${NC}\n"
-# --- END ADDED SECTION ---
+
+NAMESPACE="nxt${ROS_DOMAIN_ID}"
 
 # Check if container is running
 if [ ! "$(docker ps -q -f name=^${CONTAINER_NAME}$)" ]; then
@@ -125,4 +125,4 @@ docker exec -it ${CONTAINER_NAME} bash -c "
     fi
     source /root/ws_ros2/install/setup.bash && \\
     export ROS_DOMAIN_ID=${ROS_DOMAIN_ID} && \\
-    ros2 launch mpc_controller_ros2 mpc_omninxt.launch.py"
+    ros2 launch mpc_controller_ros2 mpc_omninxt.launch.py namespace:=${NAMESPACE}"
