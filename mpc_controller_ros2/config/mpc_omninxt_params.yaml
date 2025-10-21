@@ -9,14 +9,14 @@ mpc_controller:
 
     # Drone Physical Parameters
     drone:
-      mass: 0.72               # kg (verified from simulation: base_link 2.0 + 4 rotors @ 0.016077 kg each)
-      Ixx: 0.0010                # kg*m^2 (from x500_base inertial)
-      Iyy: 0.0014                # kg*m^2 (from x500_base inertial)
-      Izz: 0.0020                 # kg*m^2 (from x500_base inertial)
-      kx: 0.1                   # Drag coefficient X
-      ky: 0.1                   # Drag coefficient Y
-      kz: 0.1                   # Drag coefficient Z
-      kh: 0.0                   # Horizontal drag coupling coefficient
+      mass: 0.72               # kg 
+      Ixx: 0.0010              # kg*m^2 
+      Iyy: 0.0014              # kg*m^2 
+      Izz: 0.0020              # kg*m^2 
+      kx: 0.1                  # Drag coefficient X
+      ky: 0.1                  # Drag coefficient Y
+      kz: 0.1                  # Drag coefficient Z
+      kh: 0.0                  # Horizontal drag coupling coefficient
 
       # Control limits
       thrust_min: 0.1           # Minimum thrust (N)
@@ -30,10 +30,10 @@ mpc_controller:
       arm_length: 0.0756         # Distance from center to motor (m) - sqrt(0.174^2 + 0.174^2)
       arm_angle_deg: 45       # Angle between arms (degrees)
       rotor_inertia: 1.0e-07  # Rotor inertia Izz (kg*m^2) from rotor link
-      thrust_coefficient: 2.5e-06          # Effective thrust coefficient 
-      torque_coefficient: 2.5e-07         # Torque coefficient (in generat 0.1 × thrust_coefficient)
-      max_rotor_rpm: 2085.0     # Maximum rotor speed in rad/s 
-      esc_scale: 0.0044        # ESC rpm measurements are multiplied by rpm to rad/s constant and by this scale as well because simulation doesn't return rpm, but rad/s, so we compensate the rpm to rad/s constant with with scale
+      thrust_coefficient: 4.5e-07          # Effective thrust coefficient 
+      torque_coefficient: 4.5e-09         # Torque coefficient
+      max_rotor_rpm: 45000.0     # Maximum rotor speed in rpm 
+      esc_scale: 0.01        # ESC rpm measurements are multiplied by rpm to rad/s constant and by this scale as well because simulation doesn't return rpm, but rad/s, so we compensate the rpm to rad/s constant with with scale
 
     # MPC Configuration
     mpc:
