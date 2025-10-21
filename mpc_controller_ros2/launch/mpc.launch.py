@@ -14,6 +14,7 @@ def generate_launch_description():
         name='mpc_controller',               # Updated to match Node constructor name
         output='screen',
         emulate_tty=True,
+        namespace="nxt2",
         parameters=[params_file]
     )
 
