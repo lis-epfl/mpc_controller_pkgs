@@ -15,6 +15,17 @@ echo -e "${GREEN}MPC Controller Development Launcher${NC}"
 echo "This script ensures all changes are picked up"
 echo ""
 
+# --- ADDED: Handle ROS_DOMAIN_ID from command-line argument ---
+if [ -z "$1" ]; then
+    echo -e "${YELLOW}Usage: $0 <ROS_DOMAIN_ID>${NC}"
+    echo -e "${YELLOW}No ROS_DOMAIN_ID provided. Using default: 0${NC}"
+    ROS_DOMAIN_ID=0
+else
+    ROS_DOMAIN_ID=$1
+fi
+echo -e "${BLUE}Using ROS_DOMAIN_ID: ${ROS_DOMAIN_ID}${NC}\n"
+# --- END ADDED SECTION ---
+
 # Check if container is running
 if [ ! "$(docker ps -q -f name=^${CONTAINER_NAME}$)" ]; then
     echo -e "${YELLOW}Starting container...${NC}"
@@ -106,11 +117,12 @@ docker exec ${CONTAINER_NAME} bash -c '
 
 # Launch
 echo -e "${GREEN}Launching MPC controller...${NC}"
-docker exec -it ${CONTAINER_NAME} bash -c '
-    if [ -f "/opt/ros/humble/install/setup.bash" ]; then
+docker exec -it ${CONTAINER_NAME} bash -c "
+    if [ -f \"/opt/ros/humble/install/setup.bash\" ]; then
         source /opt/ros/humble/install/setup.bash
-    elif [ -f "/opt/ros/humble/setup.bash" ]; then
+    elif [ -f \"/opt/ros/humble/setup.bash\" ]; then
         source /opt/ros/humble/setup.bash
     fi
-    source /root/ws_ros2/install/setup.bash && \
-    ros2 launch mpc_controller_ros2 mpc.launch.py'
+    source /root/ws_ros2/install/setup.bash && \\
+    export ROS_DOMAIN_ID=${ROS_DOMAIN_ID} && \\
+    ros2 launch mpc_controller_ros2 mpc_omninxt.launch.py"
