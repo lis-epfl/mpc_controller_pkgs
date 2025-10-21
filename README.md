@@ -125,10 +125,11 @@ For native installation, follow these steps based on the Docker configuration:
 
 The MPC and INDI parameters can be configured in `config/mpc_config.yaml`. The horizon and the number of steps for the MPC can only be changed inside `generate_acados_solvers.py`.
 For options that can be passed to the trajectory publisher and the plotter scripts, check the arguments inside them. The default trajectory publisher with no arguments will publish a helix.
+**For the simulation to work, you need to download and launch** [QGroundControl](https://docs.qgroundcontrol.com/master/en/qgc-user-guide/getting_started/download_and_install.html).
 
 ### Docker Usage with Simulation
 
-For the simulation to work, you need to download and launch [QGroundControl](https://docs.qgroundcontrol.com/master/en/qgc-user-guide/getting_started/download_and_install.html). Follow these steps to run the MPC controller with simulation in Docker:
+ Follow these steps to run the MPC controller with simulation in Docker:
 
 1. **Start the simulation environment:**
    ```bash
