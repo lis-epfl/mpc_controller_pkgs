@@ -132,7 +132,7 @@ Follow these steps to run the MPC controller with simulation in Docker:
 
 1. **Start the simulation environment:**
    ```bash
-   ./docker/run_sim.sh
+   ./docker/run_simulation.sh
    ```
 
 2. **Launch the MPC controller:**
@@ -149,7 +149,7 @@ Follow these steps to run the MPC controller with simulation in Docker:
 4. **Run the trajectory publisher:**
    ```bash
    source install/setup.bash
-   cd scripts
+   cd /src/mpc_controller_pkgs/mpc_controller_ros2/scripts
    python3 trajectory_publisher.py 
    ```
 
@@ -188,7 +188,7 @@ For native installation:
 In a new terminal, in your ros2 workspace:
    ```bash
    source install/setup.bash
-   cd src/mpc_controller_pkgs/scripts
+   cd src/mpc_controller_pkgs/mpc_controller_ros2/scripts
    python3 trajectory_publisher.py
    ```
 

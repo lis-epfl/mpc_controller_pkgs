@@ -54,8 +54,6 @@ docker exec ${CONTAINER_NAME} bash -c '
         REGENERATE=true
     elif [ -z "$CURRENT_CHECKSUM" ]; then
         echo "  No Python files found - skipping generation"
-    fi
-
     else
         # Get the stored checksum
         STORED_CHECKSUM=$(cat "$CHECKSUM_FILE" 2>/dev/null)

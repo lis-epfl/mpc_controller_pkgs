@@ -1,7 +1,6 @@
 # Accept base image as build argument
 ARG BASE_IMAGE=osrf/ros:humble-desktop-full
 FROM ${BASE_IMAGE}
-
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install additional dependencies needed for PX4
@@ -14,6 +13,7 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
     python3-pip \
+    bc \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies for PX4
@@ -40,9 +40,11 @@ COPY dds_topics.yaml /root/PX4-Autopilot/src/modules/uxrce_dds_client/dds_topics
 # Install older setuptools to prevent build errors
 RUN pip3 install "setuptools<58.0.0"
 
-# Run PX4 setup script
-RUN sed -i '/sudo reboot/d' PX4-Autopilot/Tools/setup/ubuntu.sh && \
-    bash PX4-Autopilot/Tools/setup/ubuntu.sh
+# Update apt cache before running PX4 setup script
+RUN apt-get update && \
+    sed -i '/sudo reboot/d' PX4-Autopilot/Tools/setup/ubuntu.sh && \
+    bash PX4-Autopilot/Tools/setup/ubuntu.sh && \
+    rm -rf /var/lib/apt/lists/*
 
 # Create and build ROS 2 workspace
 RUN mkdir -p /root/ws_ros2/src
