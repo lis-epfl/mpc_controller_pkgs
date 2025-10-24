@@ -27,7 +27,7 @@ mpc_controller:
       torque_max_z: 10.0         # Maximum yaw torque (N*m) - 4 × 0.016 × 6.98e-06 × 1000²
 
       # Quadrotor geometry and actuator parameters
-      arm_length: 0.0756         # Distance from center to motor (m) - sqrt(0.174^2 + 0.174^2)
+      arm_length: 0.0756         # Distance from center to motor (m) 
       arm_angle_deg: 45       # Angle between arms (degrees)
       rotor_inertia: 1.0e-07  # Rotor inertia Izz (kg*m^2) from rotor link
       thrust_coefficient: 4.5e-07          # Effective thrust coefficient 

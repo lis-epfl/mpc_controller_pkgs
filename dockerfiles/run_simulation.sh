@@ -3,6 +3,10 @@
 CONTAINER_NAME="px4_sim_container"
 IMAGE_NAME="px4_simulation:latest"
 
+# Allow local connections to the X server
+echo "Setting xhost permissions for Docker GUI..."
+xhost +local:
+
 # Check if container already exists
 if [ "$(docker ps -aq -f name=^${CONTAINER_NAME}$)" ]; then
     echo "Container ${CONTAINER_NAME} already exists."

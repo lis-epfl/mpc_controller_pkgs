@@ -51,14 +51,14 @@ The Docker installation provides a containerized environment with all dependenci
    ```bash
    # Build the simulation environment
    ./docker/build_simulation.sh
-   
+
    # Build the MPC controller
    ./docker/build_mpc.sh
    ```
 
 ### Native Installation
 
-For native installation, follow these steps based on the Docker configuration:
+For native installation, follow these steps:
 
 1. **Install ROS2 Humble:**
    ```bash
@@ -66,60 +66,123 @@ For native installation, follow these steps based on the Docker configuration:
    sudo apt update && sudo apt install curl gnupg lsb-release
    sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
-   
+
    # Install ROS2 Humble
    sudo apt update
    sudo apt install ros-humble-desktop python3-rosdep2
    ```
 
-2. **Install ACADOS:**
+2. **Setup Python virtual environment:**
+   ```bash
+   sudo apt install python3-venv
+   python3 -m venv ~/mpc_venv
+   ```
+
+3. **Install ACADOS:**
    ```bash
    # Clone ACADOS repository
-   git clone https://github.com/acados/acados.git ~/acados
-   cd ~/acados
-   git submodule update --recursive --init
-   
-   # Build and install ACADOS
-   mkdir -p build && cd build
-   cmake -DACADOS_WITH_QPOASES=ON -DACADOS_WITH_OSQP=ON ..
-   make install -j4
-   
-   # Set environment variables
-   echo "export ACADOS_SOURCE_DIR=$HOME/acados" >> ~/.bashrc
-   echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/acados/lib" >> ~/.bashrc
-   echo "export ACADOS_INSTALL_DIR=$HOME/acados" >> ~/.bashrc
+   cd /opt
+   sudo git clone https://github.com/acados/acados.git
+   cd acados
+   sudo git checkout v0.5.1
+   sudo git submodule update --init --recursive
+
+   # Create build directory and configure
+   sudo mkdir build && cd build
+   sudo cmake -DACADOS_WITH_QPOASES=ON \
+              -DACADOS_WITH_OSQP=ON \
+              -DCMAKE_BUILD_TYPE=Release \
+              ..
+   sudo make -j$(nproc)
+   sudo make install
+   ```
+
+4. **Set environment variables:**
+   Add the following to your `~/.bashrc`:
+   ```bash
+   export ACADOS_SOURCE_DIR=/opt/acados
+   export LD_LIBRARY_PATH=/opt/acados/lib:$LD_LIBRARY_PATH
+   export PYTHONPATH=/opt/acados/interfaces/acados_template:$PYTHONPATH
+   ```
+   Then source it:
+   ```bash
    source ~/.bashrc
    ```
 
-3. **Install Python dependencies:**
+5. **Install Python dependencies:**
    ```bash
-   # Create virtual environment (optional but recommended)
-   python3 -m venv mpc_env
-   source mpc_env/bin/activate
-   
+   # Activate virtual environment
+   source ~/mpc_venv/bin/activate
+
    # Install required packages
-   pip install numpy scipy matplotlib
-   pip install casadi>=3.5.5
-   pip install -e ~/acados/interfaces/acados_template
+   pip install numpy==1.24.4 \
+               scipy==1.8.0 \
+               matplotlib==3.5.1 \
+               pyyaml==5.3.1 \
+               pandas==2.0.3
    ```
 
-4. **Install additional ROS2 dependencies:**
+6. **Build and install t_renderer (required for ACADOS):**
    ```bash
-   sudo apt install ros-humble-gazebo-ros-pkgs \
-                    ros-humble-ros2-control \
-                    ros-humble-ros2-controllers \
-                    ros-humble-xacro \
-                    ros-humble-joint-state-publisher-gui \
-                    ros-humble-rviz2
+   # Install Rust (needed to build t_renderer)
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+   source ~/.cargo/env
+
+   # Clone and build t_renderer
+   cd /tmp
+   git clone https://github.com/acados/tera_renderer.git
+   cd tera_renderer
+   git checkout v0.2.0
+   cargo build --release
+
+   # Copy the binary to acados
+   sudo mkdir -p /opt/acados/bin
+   sudo cp target/release/t_renderer /opt/acados/bin/
+   sudo chmod +x /opt/acados/bin/t_renderer
+
+   # Clean up
+   cd /tmp
+   rm -rf tera_renderer
    ```
 
-5. **Build the workspace:**
+7. **Install ACADOS Python interface:**
    ```bash
-   cd ~/ros2_ws/src/
-   git clone https://github.com/lis-epfl/mpc_controller_pkgs.git
-   colcon build --symlink-install --packages-select px4_msgs mpc_controller_ros2_msgs mpc_controller_ros2 px4_sim_bridge_ros2
-   source install/setup.bash
+   # Activate virtual environment
+   source ~/mpc_venv/bin/activate
+
+   # Change ownership (replace 'lis:lis' with your username:group)
+   sudo chown -R lis:lis /opt/acados
+
+   # Install acados template
+   cd /opt/acados/interfaces/acados_template
+   pip install --no-build-isolation -e .
    ```
+
+8. **Setup workspace and clone packages:**
+   ```bash
+   # Create workspace if it doesn't exist
+   mkdir -p ~/ros2_ws/src
+   cd ~/ros2_ws/src
+
+   # Clone the MPC controller packages
+   git clone https://github.com/lis-epfl/mpc_controller_pkgs
+   cd mpc_controller_pkgs
+   rm -rf dockerfiles px4_sim_bridge_ros2
+   ```
+
+9. **Generate ACADOS solvers:**
+    ```bash
+    cd ~/ros2_ws/src/mpc_controller_pkgs/mpc_controller_ros2/scripts
+    python3 generate_acados_solvers.py
+    ```
+
+11. **Build the workspace:**
+    ```bash
+    cd ~/ros2_ws
+    source /opt/ros/humble/setup.bash
+    colcon build --symlink-install --packages-select mpc_controller_ros2_msgs mpc_controller_ros2 px4_sim_bridge_ros2
+    source install/setup.bash
+    ```
 
 ## Usage
 
@@ -151,13 +214,13 @@ For options that can be passed to the trajectory publisher and the plotter scrip
    ```bash
    source install/setup.bash
    cd src/mpc_controller_pkgs/mpc_controller_ros2/scripts
-   python3 trajectory_publisher.py 
+   python3 trajectory_publisher.py
    ```
 
 5. **Visualize results:**
    After the trajectory is completed (also could be done during the flight):
    ```bash
-   python3 plot_trajectory_data.py 
+   python3 plot_trajectory_data.py
    ```
 
 To launch the controller alone without the simulation bridge (for the real drone), you can launch `/dockerfiles/launch_mpc.sh`.
@@ -169,25 +232,32 @@ For native installation:
 1. **Build package:**
   Necessary after every change to `generate_acados_solvers.py`.
    ```bash
+   cd ~/ros2_ws/src/mpc_controller_pkgs/mpc_controller_ros2/scripts
+   python3 generate_acados_solvers.py
+   cd ~/ros2_ws
    colcon build --symlink-install --packages-select px4_msgs mpc_controller_ros2_msgs mpc_controller_ros2
    ```
 
 2. **Launch the simulation from the dockerfile:**
    ```bash
+   cd ~/ros2_ws/src/mpc_controller_pkgs/
    ./dockerfiles/build_simulation.sh
    ./dockerfiles/run_simulation.sh
    ```
 
-3. **Launch the MPC controller with the drone state controller:**
+3. **Launch the MPC controller:**
    In a new terminal, in your ros2 workspace:
    ```bash
+   cd ~/ros2_ws
    source install/setup.bash
-   ros2 launch px4_sim_bridge_ros2 sim_with_mpc.launch.py
+   ros2 launch mpc_controller_ros2 mpc.launch.py
    ```
+   Note: For simulation with PX4, you'll need to set up the simulation bridge separately.
 
 5. **Publish trajectories**
 In a new terminal, in your ros2 workspace:
    ```bash
+   cd ~/ros2_ws
    source install/setup.bash
    cd src/mpc_controller_pkgs/mpc_controller_ros2/scripts
    python3 trajectory_publisher.py
