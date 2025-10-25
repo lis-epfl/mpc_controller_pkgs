@@ -196,13 +196,14 @@ For options that can be passed to the trajectory publisher and the plotter scrip
 
 1. **Start the simulation environment:**
    ```bash
-   ./docker/run_simulation.sh
+   ./dockerfiles/run_simulation.sh
    ```
 
 2. **Launch the MPC controller:**
    In a new terminal:
    ```bash
-   ./docker/launch_sim_mpc.sh
+   cd dockerfiles
+   ./launch_sim_mpc.sh
    ```
 
 3. **Access the container:**
@@ -223,7 +224,7 @@ For options that can be passed to the trajectory publisher and the plotter scrip
    python3 plot_trajectory_data.py
    ```
 
-To launch the controller alone without the simulation bridge (for the real drone), you can launch `/dockerfiles/launch_mpc.sh`.
+To launch the controller alone without the simulation bridge (for the real drone), you can launch `launch_mpc.sh`.
 
 ### Native Usage
 
