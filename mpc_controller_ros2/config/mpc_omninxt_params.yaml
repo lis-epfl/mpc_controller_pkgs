@@ -21,14 +21,14 @@
       # Control limits
       thrust_min: 0.1           # Minimum thrust (N)
       thrust_max: 17.14         # Maximum thrust (N) - calibrated from hover test at 0.725 command
-      rate_max_xy: 17.14         # Maximum roll/pitch rate (rad/s) - reduced from 20.0 for safety
+      rate_max_xy: 20.0         # Maximum roll/pitch rate (rad/s) - reduced from 20.0 for safety
       rate_max_z: 2.0           # Maximum yaw rate (rad/s) - increased from 1.0 based on capability
       torque_max_xy: 20.0        # Maximum roll/pitch torque (N*m) - 2 × (27.93/4) × 0.246
       torque_max_z: 10.0         # Maximum yaw torque (N*m) - 4 × 0.016 × 6.98e-06 × 1000²
 
       # Quadrotor geometry and actuator parameters
       arm_length: 0.0756         # Distance from center to motor (m) 
-      arm_angle_deg: 45       # Angle between arms (degrees)
+      arm_angle_deg: 45.0       # Angle between arms (degrees)
       rotor_inertia: 1.0e-07  # Rotor inertia Izz (kg*m^2) from rotor link
       thrust_coefficient: 4.5e-07          # Effective thrust coefficient 
       torque_coefficient: 4.5e-09         # Torque coefficient

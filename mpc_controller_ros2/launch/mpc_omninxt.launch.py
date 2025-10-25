@@ -8,7 +8,7 @@ from launch.substitutions import LaunchConfiguration
 def generate_launch_description():
     pkg_name = 'mpc_controller_ros2'
     pkg_share = get_package_share_directory(pkg_name)
-    params_file = os.path.join(pkg_share, 'config', 'mpc_ominixt_params.yaml')
+    params_file = os.path.join(pkg_share, 'config', 'mpc_omninxt_params.yaml')
 
     namespace_arg = DeclareLaunchArgument(
         'namespace',
@@ -33,6 +33,6 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        namespace_arg,  # ADD THIS - the argument declaration must be included!
+        namespace_arg, 
         mpc_node
     ])
