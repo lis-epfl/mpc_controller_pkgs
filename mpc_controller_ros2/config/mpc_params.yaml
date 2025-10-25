@@ -1,4 +1,4 @@
-mpc_controller:
+/**:
   ros__parameters:
     # Controller Configuration
     controller:

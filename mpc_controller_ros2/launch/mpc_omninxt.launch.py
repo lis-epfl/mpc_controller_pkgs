@@ -5,7 +5,6 @@ from launch_ros.actions import Node
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 
-
 def generate_launch_description():
     pkg_name = 'mpc_controller_ros2'
     pkg_share = get_package_share_directory(pkg_name)
@@ -13,14 +12,14 @@ def generate_launch_description():
 
     namespace_arg = DeclareLaunchArgument(
         'namespace',
-        default_value='',
-        description='Namespace for the MPC controller node'
+        default_value='nxt0',
+        description='Namespace for the MPC controller'
     )
 
     mpc_node = Node(
         package=pkg_name,
-        executable='mpc_controller_node',   # Executable name stays the same
-        name='mpc_controller',               # Updated to match Node constructor name
+        executable='mpc_controller_node',
+        name='mpc_controller',
         namespace=LaunchConfiguration('namespace'),
         output='screen',
         emulate_tty=True,
@@ -28,12 +27,12 @@ def generate_launch_description():
         remappings=[
             ('/fmu/in/vehicle_rates_setpoint', '/mpc/out/vehicle_rates_setpoint'),
             ('/fmu/in/vehicle_torque_setpoint', '/mpc/out/vehicle_torque_setpoint'),
-            ('/fmu/in/vehicle_thrust_setpoint',
-             '/mpc/out/vehicle_thrust_setpoint'),
+            ('/fmu/in/vehicle_thrust_setpoint', '/mpc/out/vehicle_thrust_setpoint'),
             ('/fmu/in/actuator_motors', '/mpc/out/actuator_motors'),
         ]
     )
 
     return LaunchDescription([
+        namespace_arg,  # ADD THIS - the argument declaration must be included!
         mpc_node
     ])
