@@ -60,25 +60,13 @@ The Docker installation provides a containerized environment with all dependenci
 
 For native installation, follow these steps:
 
-1. **Install ROS2 Humble:**
-   ```bash
-   # Add ROS2 repository
-   sudo apt update && sudo apt install curl gnupg lsb-release
-   sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
-   echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
-
-   # Install ROS2 Humble
-   sudo apt update
-   sudo apt install ros-humble-desktop python3-rosdep2
-   ```
-
-2. **Setup Python virtual environment:**
+1. **Setup Python virtual environment:**
    ```bash
    sudo apt install python3-venv
    python3 -m venv ~/mpc_venv
    ```
 
-3. **Install ACADOS:**
+2. **Install ACADOS:**
    ```bash
    # Clone ACADOS repository
    cd /opt
@@ -97,7 +85,7 @@ For native installation, follow these steps:
    sudo make install
    ```
 
-4. **Set environment variables:**
+3. **Set environment variables:**
    Add the following to your `~/.bashrc`:
    ```bash
    export ACADOS_SOURCE_DIR=/opt/acados
@@ -109,7 +97,7 @@ For native installation, follow these steps:
    source ~/.bashrc
    ```
 
-5. **Install Python dependencies:**
+4. **Install Python dependencies:**
    ```bash
    # Activate virtual environment
    source ~/mpc_venv/bin/activate
@@ -122,7 +110,7 @@ For native installation, follow these steps:
                pandas==2.0.3
    ```
 
-6. **Build and install t_renderer (required for ACADOS):**
+5. **Build and install t_renderer (required for ACADOS):**
    ```bash
    # Install Rust (needed to build t_renderer)
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -145,7 +133,7 @@ For native installation, follow these steps:
    rm -rf tera_renderer
    ```
 
-7. **Install ACADOS Python interface:**
+6. **Install ACADOS Python interface:**
    ```bash
    # Activate virtual environment
    source ~/mpc_venv/bin/activate
@@ -158,7 +146,7 @@ For native installation, follow these steps:
    pip install --no-build-isolation -e .
    ```
 
-8. **Setup workspace and clone packages:**
+7. **Setup workspace and clone packages:**
    ```bash
    # Create workspace if it doesn't exist
    mkdir -p ~/ros2_ws/src
