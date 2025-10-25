@@ -112,7 +112,7 @@ MpcController::MpcController(const rclcpp::NodeOptions &options)
   trajectory_logger_ = std::make_unique<TrajectoryLogger>(log_directory_);
 
   // Start logging immediately if enabled
-  if (enable_logging_) {
+  if (enable_logging_ && controller_enabled_) {
     trajectory_logger_->startNewLog();
     RCLCPP_INFO(this->get_logger(), "Trajectory logging started: %s",
                 trajectory_logger_->getCurrentLogPath().c_str());
@@ -153,27 +153,63 @@ MpcController::~MpcController() {
   }
 }
 
+void MpcController::enableControllerCallback(
+    const std_msgs::msg::Bool::SharedPtr msg) {
+
+  bool should_start_logging = false;
+
+  {
+    std::lock_guard<std::mutex> lock(controller_enabled_mutex_);
+    if (msg->data) {
+      if (!controller_enabled_) {
+        RCLCPP_INFO(this->get_logger(), "Controller ENABLED via topic");
+        controller_enabled_ = true;
+        last_indi_run_time_ = this->get_clock()->now();
+        should_start_logging = enable_logging_;
+      }
+    } else {
+      if (controller_enabled_) {
+        RCLCPP_WARN(this->get_logger(), "Controller DISABLED via topic");
+        controller_enabled_ = false;
+        should_start_logging = false;  // Will trigger stop logging below
+      }
+    }
+  }
+
+  if (msg->data && should_start_logging && trajectory_logger_) {
+    trajectory_logger_->startNewLog();
+    RCLCPP_INFO(this->get_logger(), "Started new log file: %s",
+                trajectory_logger_->getCurrentLogPath().c_str());
+  } else if (!msg->data && enable_logging_ && trajectory_logger_) {
+    trajectory_logger_->stopLogging();
+    RCLCPP_INFO(this->get_logger(), "Stopped logging");
+  }
+}
+
 void MpcController::enableControllerService(
     const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
     std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
   (void)request; // Unused parameter
 
-  std::lock_guard<std::mutex> lock(controller_enabled_mutex_);
+  bool should_start_logging = false;
 
-  controller_enabled_ = true;
+  {
+    std::lock_guard<std::mutex> lock(controller_enabled_mutex_);
+    controller_enabled_ = true;
 
-  // Reset controller state for smooth startup
-  solver_->reset();
-  solver_failure_count_ = 0;
-
-  last_indi_run_time_ = this->get_clock()->now();
+    // Reset controller state for smooth startup
+    solver_->reset();
+    solver_failure_count_ = 0;
+    last_indi_run_time_ = this->get_clock()->now();
+    should_start_logging = enable_logging_;
+  } // Mutex released here
 
   response->success = true;
   response->message = "Controller enabled successfully";
   RCLCPP_INFO(this->get_logger(), "Controller ENABLED via service");
 
-  // Start logging if enabled
-  if (enable_logging_ && trajectory_logger_) {
+  // Start logging OUTSIDE the mutex lock
+  if (should_start_logging && trajectory_logger_) {
     trajectory_logger_->startNewLog();
     RCLCPP_INFO(this->get_logger(), "Started new log file: %s",
                 trajectory_logger_->getCurrentLogPath().c_str());
@@ -185,47 +221,22 @@ void MpcController::disableControllerService(
     std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
   (void)request; // Unused parameter
 
-  std::lock_guard<std::mutex> lock(controller_enabled_mutex_);
+  bool should_stop_logging = false;
 
-  controller_enabled_ = false;
+  {
+    std::lock_guard<std::mutex> lock(controller_enabled_mutex_);
+    controller_enabled_ = false;
+    should_stop_logging = enable_logging_;
+  } // Mutex released here
 
   response->success = true;
   response->message = "Controller disabled successfully";
   RCLCPP_WARN(this->get_logger(), "Controller DISABLED via service");
 
-  // Stop logging if enabled
-  if (enable_logging_ && trajectory_logger_) {
+  // Stop logging OUTSIDE the mutex lock
+  if (should_stop_logging && trajectory_logger_) {
     trajectory_logger_->stopLogging();
     RCLCPP_INFO(this->get_logger(), "Stopped logging");
-  }
-}
-
-void MpcController::enableControllerCallback(
-    const std_msgs::msg::Bool::SharedPtr msg) {
-
-  std::lock_guard<std::mutex> lock(controller_enabled_mutex_);
-  if (msg->data) {
-    if (!controller_enabled_) {
-      RCLCPP_INFO(this->get_logger(), "Controller ENABLED via topic");
-      controller_enabled_ = true;
-      last_indi_run_time_ = this->get_clock()->now();
-      // Start logging if enabled
-      if (enable_logging_ && trajectory_logger_) {
-        trajectory_logger_->startNewLog();
-        RCLCPP_INFO(this->get_logger(), "Started new log file: %s",
-                    trajectory_logger_->getCurrentLogPath().c_str());
-      }
-    }
-  } else {
-    if (controller_enabled_) {
-      RCLCPP_WARN(this->get_logger(), "Controller DISABLED via topic");
-      controller_enabled_ = false;
-      // Stop logging if enabled
-      if (enable_logging_ && trajectory_logger_) {
-        trajectory_logger_->stopLogging();
-        RCLCPP_INFO(this->get_logger(), "Stopped logging");
-      }
-    }
   }
 }
 
@@ -566,6 +577,7 @@ void MpcController::indiControlLoop() {
   {
     std::lock_guard<std::mutex> lock(controller_enabled_mutex_);
     if (!controller_enabled_) {
+      std::cout << "returning indi" << std::endl;
       return;
     }
   }
@@ -869,6 +881,7 @@ void MpcController::mpcControlLoop() {
   // Get current state from ROS
   std::vector<double> x_current_local;
   rclcpp::Time state_timestamp;
+
   {
     std::lock_guard<std::mutex> lock(state_mutex_);
     if (!pose_received_) {

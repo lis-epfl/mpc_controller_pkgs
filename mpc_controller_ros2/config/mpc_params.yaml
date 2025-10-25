@@ -4,7 +4,7 @@
     controller:
       type: "RATE"            # Options: "RATE" or "TORQUE"
       use_direct_torque: false  # If true, send torque/thrust directly to PX4 (no INDI); in the simulation sending a direct torque leads to instability unless we change Ixx = 0.004 and Iyy = 0.0065 and Izz = 0.01 
-      enabled: true
+      enabled: false
       verbose: false
 
     # Drone Physical Parameters
