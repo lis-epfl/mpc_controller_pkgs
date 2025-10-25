@@ -166,8 +166,6 @@ For native installation, follow these steps:
 
    # Clone the MPC controller packages
    git clone https://github.com/lis-epfl/mpc_controller_pkgs
-   cd mpc_controller_pkgs
-   rm -rf dockerfiles px4_sim_bridge_ros2
    ```
 
 9. **Generate ACADOS solvers:**
