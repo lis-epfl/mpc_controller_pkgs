@@ -962,7 +962,7 @@ void MpcController::mpcControlLoop() {
         ref_point[0] = x_init_[0];
         ref_point[1] = x_init_[1];
         ref_point[2] = x_init_[2];
-        ref_point[6] = 0.0; // qw
+        ref_point[6] = 1.0; // qw
         ref_point[7] = 0.0; // qx
         ref_point[8] = 0.0; // qy
         ref_point[9] = 0.0; // qz
