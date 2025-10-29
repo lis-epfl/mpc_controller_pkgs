@@ -20,7 +20,7 @@
 
       # Control limits
       thrust_min: 0.1           # Minimum thrust (N)
-      thrust_max: 26.0         # Maximum thrust (N) - calibrated from hover test at 0.725 command
+      thrust_max: 20.7         # Maximum thrust (N) - calibrated from hover test at 0.725 command
       rate_max_xy: 20.0         # Maximum roll/pitch rate (rad/s) - reduced from 20.0 for safety
       rate_max_z: 2.0           # Maximum yaw rate (rad/s) - increased from 1.0 based on capability
       torque_max_xy: 20.0        # Maximum roll/pitch torque (N*m) - 2 × (27.93/4) × 0.246

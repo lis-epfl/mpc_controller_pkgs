@@ -192,6 +192,13 @@ For options that can be passed to the trajectory publisher and the plotter scrip
    ./launch_sim_mpc.sh
    ```
 
+   Wait for the take off to finish then enable the controller:
+   ```bash
+   cd ~/ros2_ws
+   source install/setup.bash
+   ros2 service call /mpc_controller/enable_controller std_srvs/srv/Trigger {}
+   ```
+
 3. **Access the container:**
    ```bash
    docker exec -it ros2_mpc_container bash
@@ -222,7 +229,7 @@ For native installation:
    cd ~/ros2_ws/src/mpc_controller_pkgs/mpc_controller_ros2/scripts
    python3 generate_acados_solvers.py
    cd ~/ros2_ws
-   colcon build --symlink-install --packages-select px4_msgs mpc_controller_ros2_msgs mpc_controller_ros2
+   colcon build --symlink-install --packages-select px4_msgs mpc_controller_ros2_msgs mpc_controller_ros2 px4_sim_bridge_ros2
    ```
 
 2. **Launch the simulation from the dockerfile:**
@@ -237,7 +244,14 @@ For native installation:
    ```bash
    cd ~/ros2_ws
    source install/setup.bash
-   ros2 launch mpc_controller_ros2 mpc.launch.py
+   ros2 launch px4_sim_bridge_ros2 sim_with_mpc.launch.py
+   ```
+
+   Wait for the take off to finish then enable the controller:
+   ```bash
+   cd ~/ros2_ws
+   source install/setup.bash
+   ros2 service call /mpc_controller/enable_controller std_srvs/srv/Trigger {}
    ```
    Note: For simulation with PX4, you'll need to set up the simulation bridge separately.
 
