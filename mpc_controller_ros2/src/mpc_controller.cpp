@@ -177,7 +177,7 @@ void MpcController::enableControllerCallback(
   }
 
   if (msg->data) {
-    std::lock_guard<std::mutex> lock(trajectory_mutex_);
+    std::lock_guard<std::mutex> lock(x_init_mutex_);
     x_init_.clear();
   }
 
@@ -208,8 +208,9 @@ void MpcController::enableControllerService(
     last_indi_run_time_ = this->get_clock()->now();
     should_start_logging = enable_logging_;
   } // Mutex released here
+
   {
-    std::lock_guard<std::mutex> lock(trajectory_mutex_);
+    std::lock_guard<std::mutex> lock(x_init_mutex_);
     x_init_.clear();
   }
 
@@ -959,9 +960,9 @@ void MpcController::mpcControlLoop() {
       terminal_reference = horizon_references.back();
 
     } else {
+      std::lock_guard<std::mutex> lock(x_init_mutex_);
       // No trajectory - hold initial position
       if (x_init_.empty()) {
-        std::lock_guard<std::mutex> lock(trajectory_mutex_);
         x_init_.resize(3, 0.0);
         x_init_[0] = x_current_local[0];
         x_init_[1] = x_current_local[1];

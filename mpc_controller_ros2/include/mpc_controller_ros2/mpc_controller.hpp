@@ -143,6 +143,7 @@ private:
   // Thread-safe state (shared between ROS callbacks, MPC, and INDI loops)
   std::mutex state_mutex_;
   std::mutex trajectory_mutex_;
+  std::mutex x_init_mutex_;
   std::mutex controller_enabled_mutex_;
   bool pose_received_ = false;
   bool trajectory_received_ = false;
