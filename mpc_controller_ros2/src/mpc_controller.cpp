@@ -171,9 +171,14 @@ void MpcController::enableControllerCallback(
       if (controller_enabled_) {
         RCLCPP_WARN(this->get_logger(), "Controller DISABLED via topic");
         controller_enabled_ = false;
-        should_start_logging = false;  // Will trigger stop logging below
+        should_start_logging = false; // Will trigger stop logging below
       }
     }
+  }
+
+  if (msg->data) {
+    std::lock_guard<std::mutex> lock(trajectory_mutex_);
+    x_init_.clear();
   }
 
   if (msg->data && should_start_logging && trajectory_logger_) {
@@ -203,6 +208,10 @@ void MpcController::enableControllerService(
     last_indi_run_time_ = this->get_clock()->now();
     should_start_logging = enable_logging_;
   } // Mutex released here
+  {
+    std::lock_guard<std::mutex> lock(trajectory_mutex_);
+    x_init_.clear();
+  }
 
   response->success = true;
   response->message = "Controller enabled successfully";
@@ -952,6 +961,7 @@ void MpcController::mpcControlLoop() {
     } else {
       // No trajectory - hold initial position
       if (x_init_.empty()) {
+        std::lock_guard<std::mutex> lock(trajectory_mutex_);
         x_init_.resize(3, 0.0);
         x_init_[0] = x_current_local[0];
         x_init_[1] = x_current_local[1];

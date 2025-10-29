@@ -31,7 +31,7 @@
       arm_angle_deg: 45.0       # Angle between arms (degrees)
       rotor_inertia: 1.0e-07  # Rotor inertia Izz (kg*m^2) from rotor link
       thrust_coefficient: 4.5e-07          # Effective thrust coefficient 
-      torque_coefficient: 4.5e-09         # Torque coefficient
+      torque_coefficient: 2.4e-08         # Torque coefficient
       max_rotor_rpm: 45000.0     # Maximum rotor speed in rpm 
       esc_scale: 0.01        # ESC rpm measurements are multiplied by rpm to rad/s constant and by this scale as well because simulation doesn't return rpm, but rad/s, so we compensate the rpm to rad/s constant with with scale
 
