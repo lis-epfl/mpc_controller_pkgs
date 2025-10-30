@@ -102,7 +102,7 @@ MpcController::MpcController(const rclcpp::NodeOptions &options)
 
   // If using TORQUE controller with INDI, start the high-frequency INDI inner
   // loop
-  if (controller_type_ == "TORQUE" && !use_direct_torque_) {
+  if (controller_type_ == "TORQUE" && indi_enabled_) {
     indi_timer_ = this->create_wall_timer(
         std::chrono::milliseconds(static_cast<int>(1000.0 / indi_freq_)),
         std::bind(&MpcController::indiControlLoop, this));
@@ -127,11 +127,17 @@ MpcController::MpcController(const rclcpp::NodeOptions &options)
   RCLCPP_INFO(this->get_logger(), "MPC Frequency: %.1f Hz", control_freq_);
 
   if (controller_type_ == "TORQUE") {
-    if (use_direct_torque_) {
+    if (!indi_enabled_) {
       RCLCPP_INFO(this->get_logger(), "Using direct torque/thrust commands");
     } else {
-      RCLCPP_INFO(this->get_logger(), "Using INDI for motor control at %.1f Hz",
-                  indi_freq_);
+      if (use_direct_torque_) {
+        RCLCPP_INFO(this->get_logger(),
+                    "Using INDI with torque/thrust commands at %.1f Hz",
+                    indi_freq_);
+      } else {
+        RCLCPP_INFO(this->get_logger(),
+                    "Using INDI with motor commands at %.1f Hz", indi_freq_);
+      }
     }
   }
 }
@@ -143,7 +149,7 @@ MpcController::~MpcController() {
   printTimingStatistics("MPC", computation_times_ms_, control_freq_);
 
   // Print INDI statistics if applicable
-  if (controller_type_ == "TORQUE" && !use_direct_torque_) {
+  if (controller_type_ == "TORQUE" && indi_enabled_) {
     std::lock_guard<std::mutex> lock(indi_stats_mutex_);
     printTimingStatistics("INDI", indi_computation_times_ms_, indi_freq_);
   }
@@ -312,10 +318,11 @@ void MpcController::printTimingStatistics(const std::string &name,
 void MpcController::declareAndLoadParams() {
   // Controller parameters
   this->declare_parameter<std::string>("controller.type", "RATE");
-  this->declare_parameter<bool>("controller.use_direct_torque", false);
   this->declare_parameter<bool>("controller.enabled", false);
   this->declare_parameter<bool>("controller.verbose", false);
   this->declare_parameter<double>("indi.frequency", 300.0);
+  this->declare_parameter<bool>("indi.enabled", false);
+  this->declare_parameter<bool>("indi.use_direct_torque", false);
 
   // Drone parameters
   this->declare_parameter<double>("drone.mass", 1.5);
@@ -371,10 +378,11 @@ void MpcController::declareAndLoadParams() {
 
   // Load all parameters
   this->get_parameter("controller.type", controller_type_);
-  this->get_parameter("controller.use_direct_torque", use_direct_torque_);
   this->get_parameter("controller.enabled", controller_enabled_);
   this->get_parameter("controller.verbose", verbose_);
   this->get_parameter("indi.frequency", indi_freq_);
+  this->get_parameter("indi.enabled", indi_enabled_);
+  this->get_parameter("indi.use_direct_torque", use_direct_torque_);
   this->get_parameter("mpc.horizon_decay_factor", horizon_decay_factor_);
   this->get_parameter("mpc.horizon_decay_type", horizon_decay_type_);
   this->get_parameter("mpc.control_frequency", control_freq_);
@@ -469,27 +477,32 @@ void MpcController::odometryCallback(
 }
 
 void MpcController::gyroCallback(px4_msgs::msg::SensorGyro::UniquePtr msg) {
+
   std::lock_guard<std::mutex> lock(state_mutex_);
+  double new_wx = msg->y;
+  double new_wy = msg->x;
+  double new_wz = -msg->z;
 
-  // Transform from NED to ENU
-  // SensorGyro provides xyz array with angular velocities in rad/s
-  current_angular_velocity_.x() = msg->y;  // Roll rate (NED Y -> ENU X)
-  current_angular_velocity_.y() = msg->x;  // Pitch rate (NED X -> ENU Y)
-  current_angular_velocity_.z() = -msg->z; // Yaw rate (NED Z -> -ENU Z)
-
-  last_gyro_timestamp_ = this->get_clock()->now();
+  if (new_wx != 0.0) {
+    last_good_angular_velocity_.x() = new_wx;
+  }
+  if (new_wy != 0.0) {
+    last_good_angular_velocity_.y() = new_wy;
+  }
+  if (new_wz != 0.0) {
+    last_good_angular_velocity_.z() = new_wz;
+  }
+  current_angular_velocity_ = last_good_angular_velocity_;
 }
 
 void MpcController::escStatusCallback(px4_msgs::msg::EscStatus::UniquePtr msg) {
   std::lock_guard<std::mutex> lock(state_mutex_);
-
-  // PX4 ESC status contains an array of ESC reports
-  for (size_t i = 0; i < 4 && i < 8; ++i) {
-    if (msg->esc[i].timestamp > 0) { // Valid data check
-      // Convert RPM to rad/s
-      current_rotor_speeds_[i] =
-          msg->esc[i].esc_rpm * RPM_TO_RAD_S * esc_scale_;
+  for (size_t i = 0; i < 4; ++i) {
+    double new_rpm = static_cast<double>(msg->esc[i].esc_rpm);
+    if (new_rpm > 0.0) {
+      last_good_rotor_speeds_[i] = new_rpm * RPM_TO_RAD_S * esc_scale_;
     }
+    current_rotor_speeds_[i] = last_good_rotor_speeds_[i];
   }
 }
 
@@ -587,7 +600,6 @@ void MpcController::indiControlLoop() {
   {
     std::lock_guard<std::mutex> lock(controller_enabled_mutex_);
     if (!controller_enabled_) {
-      std::cout << "returning indi" << std::endl;
       return;
     }
   }
@@ -606,9 +618,16 @@ void MpcController::indiControlLoop() {
     mpc_torques_cmd = latest_mpc_torques_;
   }
 
-  std::vector<double> rotor_speed_cmds =
-      runIndiController(mpc_thrust_cmd, mpc_torques_cmd);
-  publishMotorCommand(rotor_speed_cmds);
+  if (!use_direct_torque_) {
+    std::vector<double> rotor_speed_cmds =
+        runIndiController(mpc_thrust_cmd, mpc_torques_cmd);
+    publishMotorCommand(rotor_speed_cmds);
+  } else {
+    std::vector<double> thrust_torque_cmds =
+        runIndiController(mpc_thrust_cmd, mpc_torques_cmd);
+    publishTorqueCommand(thrust_torque_cmds[0], thrust_torque_cmds[1],
+                         thrust_torque_cmds[2], thrust_torque_cmds[3]);
+  }
 
   auto end_time = std::chrono::high_resolution_clock::now();
   double comp_time_ms =
@@ -1124,7 +1143,7 @@ void MpcController::mpcControlLoop() {
           u_current[3]);
     }
   } else { // TORQUE
-    if (use_direct_torque_) {
+    if (!indi_enabled_) {
       // Send thrust and torques directly to PX4
       publishTorqueCommand(u_current[0], u_current[1], u_current[2],
                            u_current[3]);
@@ -1277,14 +1296,21 @@ MpcController::runIndiController(double mpc_thrust,
   Eigen::Vector3d final_desired_torque =
       tau_f + I_v * (desired_angular_accel - omega_dot_f);
 
-  // Binary search to scale torques and avoid motor saturation
-  double max_thrust_available = thrust_max_ / 4;
-  Eigen::Matrix<double, 4, 4> G1_inv = G1.inverse();
-
   // Check if full torque causes saturation
   Eigen::Vector4d command_vector_test;
   command_vector_test(0) = mpc_thrust;
   command_vector_test.tail<3>() = final_desired_torque;
+
+  // if we are publishing direct torque commands, then publish the desired
+  // thrust and torque directly here and no longer continue with the loop
+  if (use_direct_torque_) {
+    return std::vector<double>{command_vector_test(0), command_vector_test(1),
+                               command_vector_test(2), command_vector_test(3)};
+  }
+
+  // Binary search to scale torques and avoid motor saturation
+  double max_thrust_available = thrust_max_ / 4;
+  Eigen::Matrix<double, 4, 4> G1_inv = G1.inverse();
   Eigen::Vector4d required_thrusts_test = G1_inv * command_vector_test;
 
   bool has_saturation = false;

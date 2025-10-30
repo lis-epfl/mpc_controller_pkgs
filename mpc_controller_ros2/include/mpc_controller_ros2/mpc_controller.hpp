@@ -121,6 +121,7 @@ private:
   std::string controller_type_, indi_filter_type_;
   bool use_direct_torque_; // If true, send torque/thrust directly (no INDI)
   bool controller_enabled_;
+  bool indi_enabled_;
   bool verbose_;
   int n_;
   double control_freq_, indi_freq_;
@@ -151,12 +152,15 @@ private:
   Eigen::Vector3d current_angular_velocity_{0., 0., 0.};
   std::vector<double> current_rotor_speeds_{0., 0., 0., 0.};
   rclcpp::Time last_odometry_timestamp_;
-  rclcpp::Time last_gyro_timestamp_;
 
   // Thread-safe data exchange from MPC to INDI (only used in TORQUE mode)
   std::mutex mpc_output_mutex_;
   double latest_mpc_thrust_ = 0.0;
   Eigen::Vector3d latest_mpc_torques_{0.0, 0.0, 0.0};
+
+  // last measusrement variables to replace sensor drop outs that give 0.0
+  Eigen::Vector3d last_good_angular_velocity_{0.0, 0.0, 0.0};
+  std::vector<double> last_good_rotor_speeds_{0.0, 0.0, 0.0, 0.0};
 
   // Controller state
   std::vector<double> predicted_state_cache_;
