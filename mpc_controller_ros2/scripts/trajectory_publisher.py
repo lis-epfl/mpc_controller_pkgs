@@ -28,7 +28,8 @@ class TrajectoryPublisher(Node):
             'yaw': 0.0,
             'hover_time': 2.0,
             'trajectory_type': 'helix',
-            'topic': '/planner/trajectory'
+            'topic': '/planner/trajectory',
+            'transition_time': 3.0  # Time to join the trajectory
         }
 
         # Override with command line args if provided
@@ -45,6 +46,7 @@ class TrajectoryPublisher(Node):
             self.hover_time = args.hover_time
             self.trajectory_type = args.type
             self.topic = args.topic
+            self.transition_time = args.transition_time
         else:
             # Use defaults
             self.initial_pos = default_values['initial_position']
@@ -59,6 +61,7 @@ class TrajectoryPublisher(Node):
             self.hover_time = default_values['hover_time']
             self.trajectory_type = default_values['trajectory_type']
             self.topic = default_values['topic']
+            self.transition_time = default_values['transition_time']
 
         # Publisher
         self.trajectory_pub = self.create_publisher(
@@ -72,22 +75,186 @@ class TrajectoryPublisher(Node):
         self.start_time = self.get_clock().now()
         self.trajectory_started = False
 
+        # Compute the starting point and velocity on the trajectory
+        self.trajectory_start_point, self.trajectory_start_velocity = self.get_trajectory_start_conditions()
+
         self.get_logger().info(f'Trajectory Publisher initialized')
         self.get_logger().info(f'Publishing to topic: {self.topic}')
         self.get_logger().info(f'Type: {self.trajectory_type}')
         self.get_logger().info(f'Initial position: {self.initial_pos}')
+        self.get_logger().info(f'Trajectory start point: {self.trajectory_start_point}')
+        self.get_logger().info(f'Trajectory start velocity: {self.trajectory_start_velocity}')
         self.get_logger().info(f'Radius: {self.radius} m, Pitch: {self.pitch} m/rev')
         self.get_logger().info(f'Speed: {self.speed} m/s, Revolutions: {self.n_revolutions}')
         self.get_logger().info(f'Hover time before trajectory: {self.hover_time} s')
+        self.get_logger().info(f'Transition time to join trajectory: {self.transition_time} s')
 
-        # Log expected completion time for helix
+        # Log expected completion time
         if self.trajectory_type == 'helix':
             distance_per_rev = np.sqrt((2 * np.pi * self.radius)**2 + self.pitch**2)
             time_per_rev = distance_per_rev / self.speed
             total_time = time_per_rev * self.n_revolutions
             self.get_logger().info(f'Helix distance per revolution: {distance_per_rev:.2f} m')
-            self.get_logger().info(f'Expected completion time: {total_time:.2f} s (after hover)')
+            self.get_logger().info(f'Expected trajectory time: {total_time:.2f} s (after transition)')
             self.get_logger().info(f'Final altitude will be: {self.initial_pos[2] + self.pitch * self.n_revolutions:.2f} m')
+
+    def get_trajectory_start_conditions(self):
+        """Get the starting point and velocity on the trajectory (at theta=0)"""
+        if self.trajectory_type == 'helix':
+            distance_per_revolution = np.sqrt((2 * np.pi * self.radius)**2 + self.pitch**2)
+            time_per_revolution = distance_per_revolution / self.speed
+            angular_rate = 2 * np.pi / time_per_revolution
+            vertical_rate = self.pitch / time_per_revolution
+
+            position = [
+                self.initial_pos[0] + self.radius,
+                self.initial_pos[1],
+                self.initial_pos[2]
+            ]
+            velocity = [
+                0.0,
+                self.radius * angular_rate,
+                vertical_rate
+            ]
+
+        elif self.trajectory_type == 'circle':
+            angular_rate = self.speed / self.radius
+
+            position = [
+                self.initial_pos[0] + self.radius,
+                self.initial_pos[1],
+                self.initial_pos[2]
+            ]
+            velocity = [
+                0.0,
+                self.radius * angular_rate,
+                0.0
+            ]
+
+        elif self.trajectory_type == 'lemniscate':
+            # Lemniscate is centered at initial_pos and starts from initial_pos
+            # We'll start at theta such that the lemniscate passes through origin (center)
+            # At theta = pi/2: x = 0, y = 0 (center of figure-8)
+            a = self.radius
+            angular_rate = self.speed / (2 * a)
+
+            # Start at center (initial position)
+            position = [
+                self.initial_pos[0],
+                self.initial_pos[1],
+                self.initial_pos[2]
+            ]
+            # At theta = pi/2: dx/dtheta = -a, dy/dtheta = -a
+            velocity = [
+                -a * angular_rate,
+                -a * angular_rate,
+                0.0
+            ]
+
+        elif self.trajectory_type == 'square':
+            # First waypoint to second waypoint direction
+            position = [
+                self.initial_pos[0] + self.radius,
+                self.initial_pos[1],
+                self.initial_pos[2]
+            ]
+            velocity = [
+                self.speed,
+                0.0,
+                0.0
+            ]
+        else:
+            position = self.initial_pos
+            velocity = [0.0, 0.0, 0.0]
+
+        return position, velocity
+
+    def smooth_transition(self, t_norm):
+        """
+        Smooth transition function using a quintic polynomial (5th order)
+        Returns a value between 0 and 1 that smoothly transitions
+        with specified velocity and acceleration at endpoints
+        """
+        if t_norm <= 0:
+            return 0.0
+        elif t_norm >= 1:
+            return 1.0
+        else:
+            # Quintic: 6t^5 - 15t^4 + 10t^3
+            return 6 * t_norm**5 - 15 * t_norm**4 + 10 * t_norm**3
+
+    def generate_transition_state(self, t_transition):
+        """
+        Generate state during transition from initial position to trajectory start
+        Uses quintic polynomial to match position, velocity, and acceleration at both endpoints
+
+        Boundary conditions:
+        - t=0: p=start_pos, v=start_vel=[0,0,0], a=0
+        - t=T: p=end_pos, v=end_vel, a=0
+        """
+        T = self.transition_time
+        t = t_transition
+
+        start_pos = np.array(self.initial_pos)
+        end_pos = np.array(self.trajectory_start_point)
+        start_vel = np.array([0.0, 0.0, 0.0])
+        end_vel = np.array(self.trajectory_start_velocity)
+
+        # Quintic polynomial coefficients for each dimension
+        # p(t) = c0 + c1*t + c2*t² + c3*t³ + c4*t⁴ + c5*t⁵
+        # Given boundary conditions:
+        # c0 = p0
+        # c1 = v0
+        # c2 = 0 (a0 = 0)
+        # Solving the system for c3, c4, c5:
+
+        position = np.zeros(3)
+        velocity = np.zeros(3)
+
+        for i in range(3):
+            p0 = start_pos[i]
+            pT = end_pos[i]
+            v0 = start_vel[i]
+            vT = end_vel[i]
+
+            # Quintic coefficients
+            c0 = p0
+            c1 = v0
+            c2 = 0.0  # acceleration at start is zero
+
+            # Solve for c3, c4, c5 from boundary conditions at t=T
+            # pT = c0 + c1*T + c2*T² + c3*T³ + c4*T⁴ + c5*T⁵
+            # vT = c1 + 2*c2*T + 3*c3*T² + 4*c4*T³ + 5*c5*T⁴
+            # aT = 2*c2 + 6*c3*T + 12*c4*T² + 20*c5*T³ = 0
+
+            # Matrix form: [T³  T⁴  T⁵ ] [c3]   [pT - c0 - c1*T]
+            #              [3T² 4T³ 5T⁴] [c4] = [vT - c1      ]
+            #              [6T  12T² 20T³] [c5]   [0           ]
+
+            A = np.array([
+                [T**3, T**4, T**5],
+                [3*T**2, 4*T**3, 5*T**4],
+                [6*T, 12*T**2, 20*T**3]
+            ])
+            b = np.array([
+                pT - c0 - c1*T,
+                vT - c1,
+                0.0
+            ])
+
+            c3, c4, c5 = np.linalg.solve(A, b)
+
+            # Evaluate position and velocity at time t
+            position[i] = c0 + c1*t + c2*t**2 + c3*t**3 + c4*t**4 + c5*t**5
+            velocity[i] = c1 + 2*c2*t + 3*c3*t**2 + 4*c4*t**3 + 5*c5*t**4
+
+        state = TrajectoryState()
+        state.position = Point(x=position[0], y=position[1], z=position[2])
+        state.velocity = Vector3(x=velocity[0], y=velocity[1], z=velocity[2])
+        state.orientation = self.yaw_to_quaternion(self.yaw)
+        state.angular_velocity = Vector3(x=0.0, y=0.0, z=0.0)
+
+        return state
 
     def yaw_to_quaternion(self, yaw):
         """Convert yaw angle to quaternion (rotation around z-axis)"""
@@ -117,14 +284,17 @@ class TrajectoryPublisher(Node):
             t_traj = t_start + t
 
             if t_traj < 0:
-                # Haven't started trajectory yet, hover at initial position
+                # Haven't started, hover at initial position
                 state.position = Point(
                     x=self.initial_pos[0],
                     y=self.initial_pos[1],
                     z=self.initial_pos[2]
                 )
                 state.velocity = Vector3(x=0.0, y=0.0, z=0.0)
-            elif t_traj >= time_for_revolutions:
+            elif t_traj < self.transition_time:
+                # Transition phase
+                state = self.generate_transition_state(t_traj)
+            elif t_traj - self.transition_time >= time_for_revolutions:
                 # Completed all revolutions, hover at final position
                 theta_final = angular_rate * time_for_revolutions
                 state.position = Point(
@@ -135,11 +305,12 @@ class TrajectoryPublisher(Node):
                 state.velocity = Vector3(x=0.0, y=0.0, z=0.0)
             else:
                 # Following helix trajectory
-                theta = angular_rate * t_traj
+                t_helix = t_traj - self.transition_time
+                theta = angular_rate * t_helix
                 state.position = Point(
                     x=self.initial_pos[0] + self.radius * np.cos(theta),
                     y=self.initial_pos[1] + self.radius * np.sin(theta),
-                    z=self.initial_pos[2] + vertical_rate * t_traj
+                    z=self.initial_pos[2] + vertical_rate * t_helix
                 )
                 state.velocity = Vector3(
                     x=-self.radius * angular_rate * np.sin(theta),
@@ -175,7 +346,10 @@ class TrajectoryPublisher(Node):
                     z=self.initial_pos[2]
                 )
                 state.velocity = Vector3(x=0.0, y=0.0, z=0.0)
-            elif t_traj >= time_for_revolutions:
+            elif t_traj < self.transition_time:
+                # Transition phase
+                state = self.generate_transition_state(t_traj)
+            elif t_traj - self.transition_time >= time_for_revolutions:
                 theta_final = angular_rate * time_for_revolutions
                 state.position = Point(
                     x=self.initial_pos[0] + self.radius * np.cos(theta_final),
@@ -184,7 +358,8 @@ class TrajectoryPublisher(Node):
                 )
                 state.velocity = Vector3(x=0.0, y=0.0, z=0.0)
             else:
-                theta = angular_rate * t_traj
+                t_circle = t_traj - self.transition_time
+                theta = angular_rate * t_circle
                 state.position = Point(
                     x=self.initial_pos[0] + self.radius * np.cos(theta),
                     y=self.initial_pos[1] + self.radius * np.sin(theta),
@@ -203,7 +378,7 @@ class TrajectoryPublisher(Node):
         return states
 
     def generate_lemniscate_trajectory(self, t_start, duration):
-        """Generate figure-8 (lemniscate) trajectory"""
+        """Generate figure-8 (lemniscate) trajectory starting from center"""
         n_points = int(duration / self.traj_dt) + 1
         times = np.linspace(0, duration, n_points)
 
@@ -214,6 +389,9 @@ class TrajectoryPublisher(Node):
         angular_rate = self.speed / (2 * a)
         time_for_one_loop = (2 * np.pi) / angular_rate
         time_for_revolutions = time_for_one_loop * self.n_revolutions
+
+        # Start at theta = pi/2 so the lemniscate begins at the center (initial_pos)
+        theta_offset = np.pi / 2
 
         for t in times:
             state = TrajectoryState()
@@ -226,8 +404,11 @@ class TrajectoryPublisher(Node):
                     z=self.initial_pos[2]
                 )
                 state.velocity = Vector3(x=0.0, y=0.0, z=0.0)
-            elif t_traj >= time_for_revolutions:
-                theta_final = angular_rate * time_for_revolutions
+            elif t_traj < self.transition_time:
+                # Transition phase
+                state = self.generate_transition_state(t_traj)
+            elif t_traj - self.transition_time >= time_for_revolutions:
+                theta_final = angular_rate * time_for_revolutions + theta_offset
                 denominator = 1 + np.sin(theta_final)**2
                 x_final = a * np.cos(theta_final) / denominator
                 y_final = a * np.sin(theta_final) * np.cos(theta_final) / denominator
@@ -239,7 +420,8 @@ class TrajectoryPublisher(Node):
                 )
                 state.velocity = Vector3(x=0.0, y=0.0, z=0.0)
             else:
-                theta = angular_rate * t_traj
+                t_lemn = t_traj - self.transition_time
+                theta = angular_rate * t_lemn + theta_offset
                 denominator = 1 + np.sin(theta)**2
                 x = a * np.cos(theta) / denominator
                 y = a * np.sin(theta) * np.cos(theta) / denominator
@@ -292,7 +474,10 @@ class TrajectoryPublisher(Node):
                     z=waypoints[0][2]
                 )
                 state.velocity = Vector3(x=0.0, y=0.0, z=0.0)
-            elif t_traj >= time_for_revolutions:
+            elif t_traj < self.transition_time:
+                # Transition phase
+                state = self.generate_transition_state(t_traj)
+            elif t_traj - self.transition_time >= time_for_revolutions:
                 state.position = Point(
                     x=waypoints[-1][0],
                     y=waypoints[-1][1],
@@ -300,7 +485,8 @@ class TrajectoryPublisher(Node):
                 )
                 state.velocity = Vector3(x=0.0, y=0.0, z=0.0)
             else:
-                distance_traveled = (self.speed * t_traj) % total_distance
+                t_waypoint = t_traj - self.transition_time
+                distance_traveled = (self.speed * t_waypoint) % total_distance
 
                 for i in range(len(distances)-1):
                     if distances[i] <= distance_traveled <= distances[i+1]:
@@ -371,8 +557,14 @@ class TrajectoryPublisher(Node):
             if t_start < 0:
                 self.get_logger().info(f'Hovering for {-t_start:.1f} more seconds...',
                                       throttle_duration_sec=1.0)
+            elif t_start < self.transition_time:
+                progress = (t_start / self.transition_time) * 100
+                self.get_logger().info(f'Transitioning to trajectory: {progress:.1f}%',
+                                      throttle_duration_sec=1.0)
             else:
                 # Calculate completion time based on trajectory type
+                t_traj = t_start - self.transition_time
+
                 if self.trajectory_type == 'helix':
                     distance_per_revolution = np.sqrt((2 * np.pi * self.radius)**2 + self.pitch**2)
                     time_per_revolution = distance_per_revolution / self.speed
@@ -390,11 +582,11 @@ class TrajectoryPublisher(Node):
                 else:
                     time_for_revolutions = float('inf')
 
-                if t_start >= time_for_revolutions:
+                if t_traj >= time_for_revolutions:
                     self.get_logger().info(f'{self.trajectory_type.capitalize()} complete! Hovering at final position.',
                                         throttle_duration_sec=1.0)
                 else:
-                    progress = (t_start / time_for_revolutions) * 100
+                    progress = (t_traj / time_for_revolutions) * 100
                     self.get_logger().info(f'{self.trajectory_type.capitalize()} progress: {progress:.1f}%',
                                         throttle_duration_sec=1.0)
 
@@ -411,6 +603,7 @@ def main(args=None):
     parser.add_argument('--speed', type=float, default=1.0, help='Tangential speed (m/s)')
     parser.add_argument('--revolutions', type=float, default=3.0, help='Number of revolutions')
     parser.add_argument('--hover-time', type=float, default=2.0, help='Hover time before trajectory')
+    parser.add_argument('--transition-time', type=float, default=3.0, help='Time to smoothly join trajectory')
     parser.add_argument('--yaw', type=float, default=0.0, help='Yaw angle in radians')
     parser.add_argument('--topic', type=str, default='/planner/trajectory',
                        help='Topic to publish trajectory (default: /planner/trajectory)')
@@ -426,6 +619,8 @@ def main(args=None):
     print(f"Publishing to topic: {node.topic}")
     print(f"Trajectory type: {node.trajectory_type}")
     print(f"Initial position: {node.initial_pos}")
+    print(f"Trajectory start point: {node.trajectory_start_point}")
+    print(f"Trajectory start velocity: {node.trajectory_start_velocity}")
     print(f"Radius: {node.radius} m")
     if node.trajectory_type == 'helix':
         print(f"Pitch: {node.pitch} m/revolution")
@@ -440,6 +635,7 @@ def main(args=None):
     print(f"Revolutions: {node.n_revolutions}")
     print(f"Speed: {node.speed} m/s")
     print(f"Hover time: {node.hover_time} s")
+    print(f"Transition time: {node.transition_time} s")
     print(f"Yaw: {node.yaw} rad")
     print(f"{'='*50}\n")
 
