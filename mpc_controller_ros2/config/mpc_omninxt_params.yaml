@@ -48,7 +48,7 @@
       # State weights: [px, py, pz, vx, vy, vz, qw, qx, qy, qz]
       Q_rate_diag: [100.0, 100.0, 100.0,    # Position weights
                     1.0, 1.0, 1.0,           # Velocity weights
-                    1.0, 1.0, 1.0, 0.0]      # Quaternion weights
+                    1.0, 1.0, 1.0, 1.0]      # Quaternion weights
 
       # Control weights: [thrust, wx, wy, wz]
       R_rate_diag: [0.1, 1.0, 1.0, 1.0]
@@ -57,7 +57,7 @@
       # State weights: [px, py, pz, vx, vy, vz, qw, qx, qy, qz, wx, wy, wz]
       Q_torque_diag: [100.0, 100.0, 100.0,  # Position weights
                       1.0, 1.0, 1.0,      # Velocity weights
-                      1.0, 1.0, 1.0, 0.0,    # Quaternion weights
+                      1.0, 1.0, 1.0, 1.0,    # Quaternion weights
                       2.0, 2.0, 2.0]      # Angular rate weights
 
       # Control weights: [thrust, tau_x, tau_y, tau_z]
@@ -66,9 +66,9 @@
     # INDI Configuration (only used when controller.type = "TORQUE")
     indi:
       enabled: true                # enable INDI; should already be in TORQUE mode
-      use_direct_torque: true  # If true, send torque/thrust directly to PX4 from INDI; in the simulation sending a direct torque leads to instability unless we change Ixx = 0.004 and Iyy = 0.0065 and Izz = 0.01 
+      use_direct_torque: false  # If true, send torque/thrust directly to PX4 from INDI; in the simulation sending a direct torque leads to instability unless we change Ixx = 0.004 and Iyy = 0.0065 and Izz = 0.01 
       frequency: 250.0            # INDI loop frequency (Hz)
-      filter_type: "first_order"  # Options: "butterworth" or "first_order"
+      filter_type: "butterworth"  # Options: "butterworth" or "first_order"
       filter_cutoff_hz: 50.0      # Filter cutoff frequency (Hz)
 
     # Topic Configuration

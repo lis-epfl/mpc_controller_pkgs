@@ -625,6 +625,7 @@ void MpcController::indiControlLoop() {
   } else {
     std::vector<double> thrust_torque_cmds =
         runIndiController(mpc_thrust_cmd, mpc_torques_cmd);
+    // convert from ENU to NED before sending
     publishTorqueCommand(thrust_torque_cmds[0], thrust_torque_cmds[1],
                          thrust_torque_cmds[2], thrust_torque_cmds[3]);
   }
@@ -1301,13 +1302,6 @@ MpcController::runIndiController(double mpc_thrust,
   command_vector_test(0) = mpc_thrust;
   command_vector_test.tail<3>() = final_desired_torque;
 
-  // if we are publishing direct torque commands, then publish the desired
-  // thrust and torque directly here and no longer continue with the loop
-  if (use_direct_torque_) {
-    return std::vector<double>{command_vector_test(0), command_vector_test(1),
-                               command_vector_test(2), command_vector_test(3)};
-  }
-
   // Binary search to scale torques and avoid motor saturation
   double max_thrust_available = thrust_max_ / 4;
   Eigen::Matrix<double, 4, 4> G1_inv = G1.inverse();
@@ -1379,6 +1373,13 @@ MpcController::runIndiController(double mpc_thrust,
   Eigen::Vector4d command_vector;
   command_vector(0) = mpc_thrust;
   command_vector.tail<3>() = scaled_torque;
+
+  // if we are publishing direct torque commands, then publish the desired
+  // thrust and torque directly here and no longer continue with the loop
+  if (use_direct_torque_) {
+    return std::vector<double>{command_vector(0), command_vector(1),
+                               command_vector(2), command_vector(3)};
+  }
 
   Eigen::Vector4d required_thrusts = G1_inv * command_vector;
 
