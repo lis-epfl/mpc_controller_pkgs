@@ -65,7 +65,7 @@
 
     # INDI Configuration (only used when controller.type = "TORQUE")
     indi:
-      enabled: true                # enable INDI; should already be in TORQUE mode
+      enabled: false                # enable INDI; should already be in TORQUE mode
       use_direct_torque: false  # If true, send torque/thrust directly to PX4 from INDI; in the simulation sending a direct torque leads to instability unless we change Ixx = 0.004 and Iyy = 0.0065 and Izz = 0.01 
       frequency: 250.0            # INDI loop frequency (Hz)
       filter_type: "butterworth"  # Options: "butterworth" or "first_order"
