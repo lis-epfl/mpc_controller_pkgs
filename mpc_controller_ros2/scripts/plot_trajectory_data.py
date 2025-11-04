@@ -216,6 +216,142 @@ def plot_velocity_tracking(states_df, save_path=None):
         plt.savefig(save_path, dpi=150, bbox_inches='tight')
     plt.show()
 
+def quaternion_to_euler(qw, qx, qy, qz):
+    """Convert quaternion to Euler angles (roll, pitch, yaw) in radians"""
+    # Roll (x-axis rotation)
+    sinr_cosp = 2 * (qw * qx + qy * qz)
+    cosr_cosp = 1 - 2 * (qx * qx + qy * qy)
+    roll = np.arctan2(sinr_cosp, cosr_cosp)
+
+    # Pitch (y-axis rotation)
+    sinp = 2 * (qw * qy - qz * qx)
+    pitch = np.where(np.abs(sinp) >= 1,
+                     np.sign(sinp) * np.pi / 2,  # Use 90 degrees if out of range
+                     np.arcsin(sinp))
+
+    # Yaw (z-axis rotation)
+    siny_cosp = 2 * (qw * qz + qx * qy)
+    cosy_cosp = 1 - 2 * (qy * qy + qz * qz)
+    yaw = np.arctan2(siny_cosp, cosy_cosp)
+
+    return roll, pitch, yaw
+
+def quaternion_angular_error(qw1, qx1, qy1, qz1, qw2, qx2, qy2, qz2):
+    """Calculate angular error between two quaternions in radians"""
+    # Compute quaternion product q1^-1 * q2
+    # q1^-1 = [qw1, -qx1, -qy1, -qz1] for unit quaternions
+    dqw = qw1 * qw2 + qx1 * qx2 + qy1 * qy2 + qz1 * qz2
+    dqx = qw1 * qx2 - qx1 * qw2 - qy1 * qz2 + qz1 * qy2
+    dqy = qw1 * qy2 + qx1 * qz2 - qy1 * qw2 - qz1 * qx2
+    dqz = qw1 * qz2 - qx1 * qy2 + qy1 * qx2 - qz1 * qw2
+
+    # Angular error = 2 * arccos(|dqw|)
+    # Clamp to avoid numerical issues
+    dqw_clamped = np.clip(np.abs(dqw), -1.0, 1.0)
+    angular_error = 2 * np.arccos(dqw_clamped)
+
+    return angular_error
+
+def plot_attitude_tracking(states_df, save_path=None):
+    """Plot quaternion and attitude tracking"""
+    # Check if quaternion data exists
+    quat_cols = ['qw', 'qx', 'qy', 'qz']
+    ref_quat_cols = ['ref_qw', 'ref_qx', 'ref_qy', 'ref_qz']
+
+    if not all(col in states_df.columns for col in quat_cols + ref_quat_cols):
+        print("Quaternion data not available in states")
+        return
+
+    fig = plt.figure(figsize=(16, 12))
+    time = (states_df['timestamp'] - states_df['timestamp'].iloc[0]).values
+
+    # Top section: Quaternion components
+    axes_quat = [plt.subplot(3, 2, i+1) for i in range(4)]
+
+    labels = ['qw', 'qx', 'qy', 'qz']
+    for i, (ax, label, actual, ref) in enumerate(zip(axes_quat, labels, quat_cols, ref_quat_cols)):
+        ax.plot(time, states_df[actual].values, 'b-', label='Actual', linewidth=1.5)
+        ax.plot(time, states_df[ref].values, 'r--', label='Reference', linewidth=1.5)
+        ax.set_ylabel(label)
+        ax.grid(True, alpha=0.3)
+        ax.legend(loc='upper right')
+
+        # Calculate RMSE
+        rmse = np.sqrt(np.mean((states_df[actual].values - states_df[ref].values)**2))
+        ax.text(0.02, 0.95, f'RMSE: {rmse:.4f}', transform=ax.transAxes,
+                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+        if i >= 2:  # Bottom row
+            ax.set_xlabel('Time (s)')
+
+    # Middle section: Euler angles
+    # Convert quaternions to Euler angles
+    roll_act, pitch_act, yaw_act = quaternion_to_euler(
+        states_df['qw'].values, states_df['qx'].values,
+        states_df['qy'].values, states_df['qz'].values
+    )
+    roll_ref, pitch_ref, yaw_ref = quaternion_to_euler(
+        states_df['ref_qw'].values, states_df['ref_qx'].values,
+        states_df['ref_qy'].values, states_df['ref_qz'].values
+    )
+
+    ax_euler = plt.subplot(3, 2, 5)
+    ax_euler.plot(time, np.rad2deg(roll_act), 'b-', label='Roll', linewidth=1.5)
+    ax_euler.plot(time, np.rad2deg(pitch_act), 'g-', label='Pitch', linewidth=1.5)
+    ax_euler.plot(time, np.rad2deg(yaw_act), 'm-', label='Yaw', linewidth=1.5)
+    ax_euler.plot(time, np.rad2deg(roll_ref), 'b--', alpha=0.5, linewidth=1.5)
+    ax_euler.plot(time, np.rad2deg(pitch_ref), 'g--', alpha=0.5, linewidth=1.5)
+    ax_euler.plot(time, np.rad2deg(yaw_ref), 'm--', alpha=0.5, linewidth=1.5)
+    ax_euler.set_xlabel('Time (s)')
+    ax_euler.set_ylabel('Angle (deg)')
+    ax_euler.set_title('Euler Angles (solid=actual, dashed=reference)')
+    ax_euler.legend(loc='upper right')
+    ax_euler.grid(True, alpha=0.3)
+
+    # Calculate Euler angle errors
+    roll_rmse = np.sqrt(np.mean((roll_act - roll_ref)**2))
+    pitch_rmse = np.sqrt(np.mean((pitch_act - pitch_ref)**2))
+    yaw_rmse = np.sqrt(np.mean((yaw_act - yaw_ref)**2))
+
+    euler_stats = (f'RMSE:\nRoll: {np.rad2deg(roll_rmse):.2f}°\n'
+                  f'Pitch: {np.rad2deg(pitch_rmse):.2f}°\n'
+                  f'Yaw: {np.rad2deg(yaw_rmse):.2f}°')
+    ax_euler.text(0.98, 0.95, euler_stats, transform=ax_euler.transAxes,
+                  verticalalignment='top', horizontalalignment='right',
+                  bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+    # Bottom right: Angular error
+    ax_error = plt.subplot(3, 2, 6)
+    angular_error = quaternion_angular_error(
+        states_df['qw'].values, states_df['qx'].values,
+        states_df['qy'].values, states_df['qz'].values,
+        states_df['ref_qw'].values, states_df['ref_qx'].values,
+        states_df['ref_qy'].values, states_df['ref_qz'].values
+    )
+
+    ax_error.plot(time, np.rad2deg(angular_error), 'k-', linewidth=2)
+    ax_error.set_xlabel('Time (s)')
+    ax_error.set_ylabel('Angular Error (deg)')
+    ax_error.set_title('Total Attitude Error')
+    ax_error.grid(True, alpha=0.3)
+
+    # Add statistics
+    mean_error = np.rad2deg(np.mean(angular_error))
+    max_error = np.rad2deg(np.max(angular_error))
+    std_error = np.rad2deg(np.std(angular_error))
+
+    stats_text = f'Mean: {mean_error:.3f}°\nMax: {max_error:.3f}°\nStd: {std_error:.3f}°'
+    ax_error.text(0.98, 0.95, stats_text, transform=ax_error.transAxes,
+                  verticalalignment='top', horizontalalignment='right',
+                  bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+    fig.suptitle('Attitude Tracking Performance', fontsize=14, fontweight='bold')
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+    plt.show()
+
 def estimate_inertia_matrix(states_df, max_tau_c=0.1, dt=0.01):
     """
     Estimate the inertia matrix and actuator dynamics from logged torque commands and angular velocities.
@@ -1473,6 +1609,10 @@ def main():
     # Velocity tracking
     save_path = save_dir / "velocity_tracking.png" if save_dir else None
     plot_velocity_tracking(states_df, save_path)
+
+    # Attitude/Quaternion tracking
+    save_path = save_dir / "attitude_tracking.png" if save_dir else None
+    plot_attitude_tracking(states_df, save_path)
 
     # MPC horizon comparison (if requested and available)
     if args.show_horizon and horizon_df is not None:

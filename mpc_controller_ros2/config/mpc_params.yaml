@@ -2,16 +2,16 @@
   ros__parameters:
     # Controller Configuration
     controller:
-      type: "RATE"            # Options: "RATE" or "TORQUE"; in the simulation sending a direct torque leads to instability unless we change Ixx = 0.004 and Iyy = 0.0065 and Izz = 0.01 
+      type: "TORQUE"            # Options: "RATE" or "TORQUE"; in the simulation sending a direct torque leads to instability unless we change Ixx = 0.004 and Iyy = 0.0065 and Izz = 0.01 
       enabled: false            # if false, the conroller is disabled after launching the node (recommended); you can enable it with a service/topic
       verbose: false
 
     # Drone Physical Parameters
     drone:
       mass: 1.54               # kg (verified from simulation: base_link 2.0 + 4 rotors @ 0.016077 kg each)
-      Ixx:  0.02166                # kg*m^2 (from x500_base inertial)
-      Iyy:  0.02166                # kg*m^2 (from x500_base inertial)
-      Izz:  0.04                 # kg*m^2 (from x500_base inertial)
+      Ixx:  0.0042166                # kg*m^2 (from x500_base inertial)
+      Iyy:  0.0062166                # kg*m^2 (from x500_base inertial)
+      Izz:  0.014                 # kg*m^2 (from x500_base inertial)
       kx: 0.1                   # Drag coefficient X
       ky: 0.1                   # Drag coefficient Y
       kz: 0.1                   # Drag coefficient Z
@@ -19,7 +19,7 @@
 
       # Control limits
       thrust_min: 0.1           # Minimum thrust (N)
-      thrust_max: 20.7         # Maximum thrust (N) - calibrated from hover test at 0.725 command
+      thrust_max: 20.6         # Maximum thrust (N) - calibrated from hover test at 0.725 command
       rate_max_xy: 20.0         # Maximum roll/pitch rate (rad/s) - reduced from 20.0 for safety
       rate_max_z: 2.0           # Maximum yaw rate (rad/s) - increased from 1.0 based on capability
       torque_max_xy: 20.0        # Maximum roll/pitch torque (N*m) - 2 × (27.93/4) × 0.246
@@ -42,6 +42,7 @@
       horizon_decay_factor: 0.0 # Decay of cost over the horizon (last horizon weight would be 1-horizon_decay_factor)
       horizon_decay_type: "linear" # Decay type: linear or exponential
       control_frequency: 100.0  # MPC update rate (Hz)
+      thrust_torque_cutoff_freq: 50.0  # cutoff frequency for the thrust/torque command
       computation_delay: 0.003  # Expected computation delay (s)
 
       # Cost matrices for RATE controller
@@ -65,8 +66,8 @@
 
     # INDI Configuration (only used when controller.type = "TORQUE")
     indi:
-      enabled: false               # enable INDI; should already be in TORQUE mode
-      use_direct_torque: true    # If true, send torque/thrust directly to PX4 from INDI; 
+      enabled: false              # enable INDI; should already be in TORQUE mode
+      use_direct_torque: false    # If true, send torque/thrust directly to PX4 from INDI; 
       frequency: 250.0            # INDI loop frequency (Hz)
       filter_type: "butterworth"  # Options: "butterworth" or "first_order"
       filter_cutoff_hz: 50.0      # Filter cutoff frequency (Hz)

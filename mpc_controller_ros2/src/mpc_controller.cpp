@@ -434,41 +434,38 @@ void MpcController::odometryCallback(
     current_state_.resize(nx, 0.0);
   }
 
-  // Transform from PX4 NED to ROS ENU coordinate system
-  // Position: NED to ENU
-  current_state_[0] = msg->position[1];  // East (PX4 East)
-  current_state_[1] = msg->position[0];  // North (PX4 North)
-  current_state_[2] = -msg->position[2]; // Up (negative PX4 Down)
+  // Position: FRD to FLU
+  current_state_[0] = msg->position[0];
+  current_state_[1] = -msg->position[1];
+  current_state_[2] = -msg->position[2];
 
-  // Velocity: NED to ENU
-  current_state_[3] = msg->velocity[1];  // East velocity
-  current_state_[4] = msg->velocity[0];  // North velocity
-  current_state_[5] = -msg->velocity[2]; // Up velocity
+  // Velocity: FRD to FLU
+  current_state_[3] = msg->velocity[0];
+  current_state_[4] = -msg->velocity[1];
+  current_state_[5] = -msg->velocity[2];
 
-  // Quaternion: NED to ENU transformation
-  Eigen::Quaterniond q_ned(msg->q[0], msg->q[1], msg->q[2], msg->q[3]);
+  // Quaternion: FRD to FLU transformation
+  Eigen::Quaterniond q_frd(msg->q[0], msg->q[1], msg->q[2], msg->q[3]);
 
-  // Rotation matrix from NED to ENU
-  // This is equivalent to a 180° rotation around the x-axis followed by a 90°
-  // rotation around the z-axis
-  Eigen::Quaterniond q_enu;
-  q_enu.w() = q_ned.w();
-  q_enu.x() = q_ned.y();
-  q_enu.y() = q_ned.x();
-  q_enu.z() = -q_ned.z();
+  // Quaternion FRD to FLU
+  Eigen::Quaterniond q_flu;
+  q_flu.w() = q_frd.w();
+  q_flu.x() = q_frd.x();
+  q_flu.y() = -q_frd.y();
+  q_flu.z() = -q_frd.z();
 
-  q_enu.normalize();
+  q_flu.normalize();
 
-  current_state_[6] = q_enu.w();
-  current_state_[7] = q_enu.x();
-  current_state_[8] = q_enu.y();
-  current_state_[9] = q_enu.z();
+  current_state_[6] = q_flu.w();
+  current_state_[7] = q_flu.x();
+  current_state_[8] = q_flu.y();
+  current_state_[9] = q_flu.z();
 
   // If using torque controller, also set angular velocities
   if (controller_type_ == "TORQUE" && current_state_.size() >= 13) {
-    // Angular velocity: NED to ENU
-    current_state_[10] = msg->angular_velocity[1];  // Roll rate
-    current_state_[11] = msg->angular_velocity[0];  // Pitch rate
+    // Angular velocity: FRD to FLU
+    current_state_[10] = msg->angular_velocity[0];  // Roll rate
+    current_state_[11] = -msg->angular_velocity[1]; // Pitch rate
     current_state_[12] = -msg->angular_velocity[2]; // Yaw rate
   }
 
@@ -479,8 +476,8 @@ void MpcController::odometryCallback(
 void MpcController::gyroCallback(px4_msgs::msg::SensorGyro::UniquePtr msg) {
 
   std::lock_guard<std::mutex> lock(state_mutex_);
-  double new_wx = msg->y;
-  double new_wy = msg->x;
+  double new_wx = msg->x;
+  double new_wy = -msg->y;
   double new_wz = -msg->z;
 
   if (new_wx != 0.0) {
@@ -514,12 +511,10 @@ void MpcController::publishRateCommand(double thrust, double wx, double wy,
       this->get_clock()->now().nanoseconds() / 1000; // microseconds
   msg->timestamp = timestamp;
 
-  // Transform from ENU to NED for PX4
-  // ENU: wx = roll, wy = pitch, wz = yaw
-  // NED: roll, pitch, yaw (but axes are different)
-  msg->roll = wy;  // ENU pitch rate -> NED roll rate
-  msg->pitch = wx; // ENU roll rate -> NED pitch rate
-  msg->yaw = -wz;  // ENU yaw rate -> NED yaw rate (opposite direction)
+  // Transform FRD to FLU
+  msg->roll = wx;
+  msg->pitch = -wy;
+  msg->yaw = -wz;
 
   // Normalize thrust to [-1, 1] range for PX4
   double normalized_thrust = thrust / 4;
@@ -543,7 +538,6 @@ void MpcController::publishTorqueCommand(double thrust, double tau_x,
       this->get_clock()->now().nanoseconds() / 1000; // microseconds
   thrust_msg->timestamp = timestamp;
 
-  // Transform from ENU to NED for PX4
   // Thrust is only in body z-axis, other components are zero
   double normalized_thrust = thrust / 4;
   normalized_thrust =
@@ -552,7 +546,7 @@ void MpcController::publishTorqueCommand(double thrust, double tau_x,
 
   thrust_msg->xyz[0] = 0.0;
   thrust_msg->xyz[1] = 0.0;
-  thrust_msg->xyz[2] = -normalized_thrust; // Negative because NED z is down,
+  thrust_msg->xyz[2] = -normalized_thrust; // Negative because FRD z is down,
                                            // thrust is up
 
   thrust_pub_->publish(std::move(thrust_msg));
@@ -561,13 +555,10 @@ void MpcController::publishTorqueCommand(double thrust, double tau_x,
   auto torque_msg = std::make_unique<px4_msgs::msg::VehicleTorqueSetpoint>();
   torque_msg->timestamp = timestamp;
 
-  // Transform from ENU to NED for PX4
-  // ENU: tau_x = roll, tau_y = pitch, tau_z = yaw
-  // NED: roll, pitch, yaw (but axes are different)
-  torque_msg->xyz[0] = tau_y; // ENU pitch torque -> NED roll torque
-  torque_msg->xyz[1] = tau_x; // ENU roll torque -> NED pitch torque
-  torque_msg->xyz[2] =
-      -tau_z; // ENU yaw torque -> NED yaw torque (opposite direction)
+  // Transform FRD to FLU
+  torque_msg->xyz[0] = tau_x;
+  torque_msg->xyz[1] = -tau_y;
+  torque_msg->xyz[2] = -tau_z;
 
   torque_pub_->publish(std::move(torque_msg));
 }
@@ -625,7 +616,6 @@ void MpcController::indiControlLoop() {
   } else {
     std::vector<double> thrust_torque_cmds =
         runIndiController(mpc_thrust_cmd, mpc_torques_cmd);
-    // convert from ENU to NED before sending
     publishTorqueCommand(thrust_torque_cmds[0], thrust_torque_cmds[1],
                          thrust_torque_cmds[2], thrust_torque_cmds[3]);
   }
@@ -1262,9 +1252,9 @@ MpcController::runIndiController(double mpc_thrust,
   double c = cos(arm_angle_rad_);
   double cq_ct = torque_coeff_ / thrust_coeff_;
 
-  G1 << 1, 1, 1, 1, arm_length_ * s, -arm_length_ * s, arm_length_ * s,
-      -arm_length_ * s, -arm_length_ * c, arm_length_ * c, arm_length_ * c,
-      -arm_length_ * c, -cq_ct, -cq_ct, cq_ct, cq_ct;
+  G1 << 1, 1, 1, 1, -arm_length_ * s, arm_length_ * s, arm_length_ * s,
+      -arm_length_ * s, -arm_length_ * c, arm_length_ * c, -arm_length_ * c,
+      arm_length_ * c, -cq_ct, -cq_ct, cq_ct, cq_ct;
 
   G2_bar.setZero();
   G2_bar.row(2) << -rotor_inertia_, -rotor_inertia_, rotor_inertia_,
