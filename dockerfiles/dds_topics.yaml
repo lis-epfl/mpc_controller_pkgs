@@ -10,15 +10,15 @@ publications:
 
   - topic: /fmu/out/sensor_gyro
     type: px4_msgs::msg::SensorGyro
-    rate_limit: 500.
+    rate_limit: 300.
 
   - topic: /fmu/out/esc_status
     type: px4_msgs::msg::EscStatus
-    rate_limit: 500.
+    rate_limit: 300.
 
   - topic: /fmu/out/actuator_motors
     type: px4_msgs::msg::ActuatorMotors
-    rate_limit: 500.
+    rate_limit: 300.
 
   - topic: /fmu/out/arming_check_request
     type: px4_msgs::msg::ArmingCheckRequest
