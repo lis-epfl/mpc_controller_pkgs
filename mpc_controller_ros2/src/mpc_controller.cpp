@@ -423,6 +423,30 @@ void MpcController::declareAndLoadParams() {
   R_rate_diag_ = this->get_parameter("mpc.R_rate_diag").as_double_array();
   Q_torque_diag_ = this->get_parameter("mpc.Q_torque_diag").as_double_array();
   R_torque_diag_ = this->get_parameter("mpc.R_torque_diag").as_double_array();
+
+  std::vector<double> default_gyro_transform = {1.0, 0.0, 0.0, 0.0, -1.0,
+                                                0.0, 0.0, 0.0, -1.0};
+  this->declare_parameter<std::vector<double>>("drone.gyro_transform_matrix",
+                                               default_gyro_transform);
+
+  std::vector<double> gyro_transform_vec;
+  this->get_parameter("drone.gyro_transform_matrix", gyro_transform_vec);
+
+  if (gyro_transform_vec.size() == 9) {
+    // Load as row-major, which Eigen::Map handles by default
+    gyro_transform_matrix_ =
+        Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor>>(
+            gyro_transform_vec.data());
+    RCLCPP_INFO_STREAM(this->get_logger(), "Loaded Gyro Transform Matrix:\n"
+                                               << gyro_transform_matrix_);
+  } else {
+    RCLCPP_ERROR(
+        this->get_logger(),
+        "drone.gyro_transform_matrix must have 9 elements! Using default.");
+    gyro_transform_matrix_ =
+        Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor>>(
+            default_gyro_transform.data());
+  }
 }
 
 void MpcController::odometryCallback(
@@ -476,9 +500,15 @@ void MpcController::odometryCallback(
 void MpcController::gyroCallback(px4_msgs::msg::SensorGyro::UniquePtr msg) {
 
   std::lock_guard<std::mutex> lock(state_mutex_);
-  double new_wx = msg->x;
-  double new_wy = -msg->y;
-  double new_wz = -msg->z;
+  // Create input vector from gyro message
+  Eigen::Vector3d gyro_in(msg->x, msg->y, msg->z);
+
+  // Apply the loaded transformation matrix
+  Eigen::Vector3d gyro_out_mpc = gyro_transform_matrix_ * gyro_in;
+
+  double new_wx = gyro_out_mpc.x();
+  double new_wy = gyro_out_mpc.y();
+  double new_wz = gyro_out_mpc.z();
 
   if (new_wx != 0.0) {
     last_good_angular_velocity_.x() = new_wx;

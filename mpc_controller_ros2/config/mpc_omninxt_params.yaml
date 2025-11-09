@@ -2,7 +2,7 @@
   ros__parameters:
     # Controller Configuration
     controller:
-      type: "RATE"           # Options: "RATE" or "TORQUE"
+      type: "TORQUE"           # Options: "RATE" or "TORQUE"
       enabled: false           # if false, the conroller is disabled after launching the node (recommended); you can enable it with a service/topic
       verbose: false
 
@@ -16,6 +16,20 @@
       ky: 0.1                  # Drag coefficient Y
       kz: 0.1                  # Drag coefficient Z
       kh: 0.0                  # Horizontal drag coupling coefficient
+
+      # Gyro to MPC frame transformation matrix (row-major)
+      # This defines: [x_mpc, y_mpc, z_mpc]' = M * [x_gyro, y_gyro, z_gyro]'
+      # Default (FRD-to-FLU): x_mpc=x_g, y_mpc=-y_g, z_mpc=-z_g
+      # [ 1.0,  0.0,  0.0,
+      #   0.0, -1.0,  0.0,
+      #   0.0,  0.0, -1.0 ]
+      # Omninxt (x_mpc=y_g, y_mpc=-x_g, z_mpc=z_g):
+      # [ 0.0,  1.0,  0.0,
+      #  -1.0,  0.0,  0.0,
+      #   0.0,  0.0,  1.0 ]
+      gyro_transform_matrix: [ 0.0,  1.0,  0.0,
+                               -1.0,  0.0,  0.0,
+                               0.0,  0.0,  1.0 ]
 
       # Control limits
       thrust_min: 0.1           # Minimum thrust (N)
@@ -69,7 +83,7 @@
       use_direct_torque: false  # If true, send torque/thrust directly to PX4 from INDI; in the simulation sending a direct torque leads to instability unless we change Ixx = 0.004 and Iyy = 0.0065 and Izz = 0.01 
       frequency: 300.0            # INDI loop frequency (Hz)
       filter_type: "butterworth"  # Options: "butterworth" or "first_order"
-      filter_cutoff_hz: 50.0      # Filter cutoff frequency (Hz)
+      filter_cutoff_hz: 12.0      # Filter cutoff frequency (Hz)
 
     # Topic Configuration
     topics:

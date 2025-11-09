@@ -132,6 +132,7 @@ private:
   std::string traj_topic_;
   double mass_, Ixx_, Iyy_, Izz_;
   double kx_, ky_, kz_, kh_;
+  Eigen::Matrix3d gyro_transform_matrix_;
   double arm_length_, arm_angle_rad_, rotor_inertia_, thrust_coeff_,
       torque_coeff_;
   double indi_cutoff_freq_;

@@ -17,6 +17,20 @@
       kz: 0.1                   # Drag coefficient Z
       kh: 0.0                   # Horizontal drag coupling coefficient
 
+      # Gyro to MPC frame transformation matrix (row-major)
+      # This defines: [x_mpc, y_mpc, z_mpc]' = M * [x_gyro, y_gyro, z_gyro]'
+      # Default (FRD-to-FLU): x_mpc=x_g, y_mpc=-y_g, z_mpc=-z_g
+      # [ 1.0,  0.0,  0.0,
+      #   0.0, -1.0,  0.0,
+      #   0.0,  0.0, -1.0 ]
+      # Omninxt (x_mpc=y_g, y_mpc=-x_g, z_mpc=z_g):
+      # [ 0.0,  1.0,  0.0,
+      #  -1.0,  0.0,  0.0,
+      #   0.0,  0.0,  1.0 ]
+      gyro_transform_matrix: [1.0, 0.0, 0.0,
+                              0.0, -1.0, 0.0,
+                              0.0, 0.0, -1.0]
+
       # Control limits
       thrust_min: 0.1           # Minimum thrust (N)
       thrust_max: 20.6         # Maximum thrust (N) - calibrated from hover test at 0.725 command
