@@ -183,8 +183,15 @@ void MpcController::enableControllerCallback(
   }
 
   if (msg->data) {
-    std::lock_guard<std::mutex> lock(x_init_mutex_);
-    x_init_.clear();
+    {
+      std::lock_guard<std::mutex> lock(x_init_mutex_);
+      x_init_.clear();
+    }
+    {
+      std::lock_guard<std::mutex> lock(trajectory_mutex_);
+      trajectory_received_ = false;
+      ref_trajectory_.clear();
+    }
   }
 
   if (msg->data && should_start_logging && trajectory_logger_) {
@@ -218,6 +225,12 @@ void MpcController::enableControllerService(
   {
     std::lock_guard<std::mutex> lock(x_init_mutex_);
     x_init_.clear();
+  }
+
+  {
+    std::lock_guard<std::mutex> lock(trajectory_mutex_);
+    trajectory_received_ = false;
+    ref_trajectory_.clear();
   }
 
   response->success = true;
@@ -559,7 +572,8 @@ void MpcController::publishIdleCommand() {
       // 2. Torque controller with INDI set to 'use_direct_torque'
 
       // 1. Thrust message
-      auto thrust_msg = std::make_unique<px4_msgs::msg::VehicleThrustSetpoint>();
+      auto thrust_msg =
+          std::make_unique<px4_msgs::msg::VehicleThrustSetpoint>();
       thrust_msg->timestamp = timestamp;
       thrust_msg->xyz[0] = 0.0f;
       thrust_msg->xyz[1] = 0.0f;
@@ -568,7 +582,8 @@ void MpcController::publishIdleCommand() {
       thrust_pub_->publish(std::move(thrust_msg));
 
       // 2. Torque message
-      auto torque_msg = std::make_unique<px4_msgs::msg::VehicleTorqueSetpoint>();
+      auto torque_msg =
+          std::make_unique<px4_msgs::msg::VehicleTorqueSetpoint>();
       torque_msg->timestamp = timestamp;
       torque_msg->xyz[0] = 0.0f;
       torque_msg->xyz[1] = 0.0f;
@@ -1068,7 +1083,7 @@ void MpcController::mpcControlLoop() {
       // if we are still on the ground (less then 15 cm) without any takeoff
       // trajectory yet, publish idle command
       if (x_current_local[2] <= 0.15) {
-        publishIdleCommand(); 
+        publishIdleCommand();
         return;
       }
       std::lock_guard<std::mutex> lock(x_init_mutex_);
