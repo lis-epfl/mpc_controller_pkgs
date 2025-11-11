@@ -1000,6 +1000,11 @@ void MpcController::mpcControlLoop() {
       terminal_reference = horizon_references.back();
 
     } else {
+      // if we are still on the ground (less then 15 cm) without any takeoff
+      // trajectory yet, skip iteration
+      if (x_current_local[2] <= 0.15) {
+        return;
+      }
       std::lock_guard<std::mutex> lock(x_init_mutex_);
       // No trajectory - hold initial position
       if (x_init_.empty()) {
