@@ -3,7 +3,7 @@
     # Controller Configuration
     controller:
       type: "RATE"           # Options: "RATE" or "TORQUE"
-      enabled: false           # if false, the conroller is disabled after launching the node (recommended); you can enable it with a service/topic
+      enabled: true           # if false, the conroller is disabled after launching the node (recommended); you can enable it with a service/topic
       verbose: false
 
     # Drone Physical Parameters
