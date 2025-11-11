@@ -535,7 +535,7 @@ void MpcController::escStatusCallback(px4_msgs::msg::EscStatus::UniquePtr msg) {
 
 void MpcController::publishIdleCommand() {
   // Use 5% normalized thrust/throttle for idle
-  const float idle_normalized_value = 0.05f;
+  const float idle_normalized_value = 0.01f;
   uint64_t timestamp = this->get_clock()->now().nanoseconds() / 1000;
 
   if (controller_type_ == "RATE") {
