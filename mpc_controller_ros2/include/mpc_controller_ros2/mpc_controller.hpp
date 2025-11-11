@@ -79,6 +79,7 @@ private:
   void publishTorqueCommand(double thrust, double tau_x, double tau_y,
                             double tau_z);
   void publishMotorCommand(const std::vector<double> &motor_commands);
+  void publishIdleCommand();
   void predictState(std::vector<double> &predicted_state, double dt);
   std::vector<double> runIndiController(double mpc_thrust,
                                         const Eigen::Vector3d &mpc_torques);

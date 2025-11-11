@@ -533,6 +533,71 @@ void MpcController::escStatusCallback(px4_msgs::msg::EscStatus::UniquePtr msg) {
   }
 }
 
+void MpcController::publishIdleCommand() {
+  // Use 5% normalized thrust/throttle for idle
+  const float idle_normalized_value = 0.05f;
+  uint64_t timestamp = this->get_clock()->now().nanoseconds() / 1000;
+
+  if (controller_type_ == "RATE") {
+    // Publish VehicleRatesSetpoint with 0.05 normalized thrust and zero rates
+    auto msg = std::make_unique<px4_msgs::msg::VehicleRatesSetpoint>();
+    msg->timestamp = timestamp;
+    msg->roll = 0.0f;
+    msg->pitch = 0.0f;
+    msg->yaw = 0.0f;
+    msg->thrust_body[0] = 0.0f;
+    msg->thrust_body[1] = 0.0f;
+    // PX4 expects negative for upward thrust, [0, 1] normalized
+    msg->thrust_body[2] = -idle_normalized_value;
+    rates_pub_->publish(std::move(msg));
+
+  } else if (controller_type_ == "TORQUE") {
+    if (!indi_enabled_ || (indi_enabled_ && use_direct_torque_)) {
+      // Publish 0.05 normalized thrust and zero torque
+      // This covers:
+      // 1. Torque controller without INDI
+      // 2. Torque controller with INDI set to 'use_direct_torque'
+
+      // 1. Thrust message
+      auto thrust_msg = std::make_unique<px4_msgs::msg::VehicleThrustSetpoint>();
+      thrust_msg->timestamp = timestamp;
+      thrust_msg->xyz[0] = 0.0f;
+      thrust_msg->xyz[1] = 0.0f;
+      // PX4 expects negative for upward thrust, [0, 1] normalized
+      thrust_msg->xyz[2] = -idle_normalized_value;
+      thrust_pub_->publish(std::move(thrust_msg));
+
+      // 2. Torque message
+      auto torque_msg = std::make_unique<px4_msgs::msg::VehicleTorqueSetpoint>();
+      torque_msg->timestamp = timestamp;
+      torque_msg->xyz[0] = 0.0f;
+      torque_msg->xyz[1] = 0.0f;
+      torque_msg->xyz[2] = 0.0f;
+      torque_pub_->publish(std::move(torque_msg));
+
+    } else {
+      // This is the case for:
+      // 1. Torque controller with INDI
+      // 2. 'use_direct_torque' is false (i.e., using motor commands)
+
+      // Publish ActuatorMotors with 0.05 normalized to first 4 motors
+      auto msg = std::make_unique<px4_msgs::msg::ActuatorMotors>();
+      msg->timestamp = timestamp;
+
+      // Set first 4 motors to idle value
+      for (size_t i = 0; i < 4; ++i) {
+        msg->control[i] = idle_normalized_value;
+      }
+
+      // Set unused motors to NaN (PX4 convention)
+      for (size_t i = 4; i < 12; ++i) {
+        msg->control[i] = NAN;
+      }
+      motors_pub_->publish(std::move(msg));
+    }
+  }
+}
+
 void MpcController::publishRateCommand(double thrust, double wx, double wy,
                                        double wz) {
   auto msg = std::make_unique<px4_msgs::msg::VehicleRatesSetpoint>();
@@ -1001,8 +1066,9 @@ void MpcController::mpcControlLoop() {
 
     } else {
       // if we are still on the ground (less then 15 cm) without any takeoff
-      // trajectory yet, skip iteration
+      // trajectory yet, publish idle command
       if (x_current_local[2] <= 0.15) {
+        publishIdleCommand(); 
         return;
       }
       std::lock_guard<std::mutex> lock(x_init_mutex_);
