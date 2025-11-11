@@ -2,16 +2,16 @@
   ros__parameters:
     # Controller Configuration
     controller:
-      type: "TORQUE"           # Options: "RATE" or "TORQUE"
+      type: "RATE"           # Options: "RATE" or "TORQUE"
       enabled: false           # if false, the conroller is disabled after launching the node (recommended); you can enable it with a service/topic
       verbose: false
 
     # Drone Physical Parameters
     drone:
       mass: 0.72               # kg 
-      Ixx: 0.0010              # kg*m^2 
-      Iyy: 0.0014              # kg*m^2 
-      Izz: 0.0020              # kg*m^2 
+      Ixx: 0.0025              # kg*m^2 
+      Iyy: 0.0025              # kg*m^2 
+      Izz: 0.005              # kg*m^2 
       kx: 0.1                  # Drag coefficient X
       ky: 0.1                  # Drag coefficient Y
       kz: 0.1                  # Drag coefficient Z
@@ -65,7 +65,7 @@
                     1.0, 1.0, 1.0, 1.0]      # Quaternion weights
 
       # Control weights: [thrust, wx, wy, wz]
-      R_rate_diag: [0.1, 1.0, 1.0, 1.0]
+      R_rate_diag: [0.1, 0.5, 0.5, 0.5]
 
       # Cost matrices for TORQUE controller
       # State weights: [px, py, pz, vx, vy, vz, qw, qx, qy, qz, wx, wy, wz]
@@ -75,7 +75,7 @@
                       2.0, 2.0, 2.0]      # Angular rate weights
 
       # Control weights: [thrust, tau_x, tau_y, tau_z]
-      R_torque_diag: [0.1, 10.0, 10.0, 10.0]
+      R_torque_diag: [0.1, 2.0, 2.0, 2.0]
 
     # INDI Configuration (only used when controller.type = "TORQUE")
     indi:
