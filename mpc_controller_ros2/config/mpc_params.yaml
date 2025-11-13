@@ -2,7 +2,7 @@
   ros__parameters:
     # Controller Configuration
     controller:
-      type: "TORQUE"            # Options: "RATE" or "TORQUE"; in the simulation sending a direct torque leads to instability unless we change Ixx = 0.004 and Iyy = 0.0065 and Izz = 0.01 
+      type: "RATE"            # Options: "RATE" or "TORQUE"; in the simulation sending a direct torque leads to instability unless we change Ixx = 0.004 and Iyy = 0.0065 and Izz = 0.01 
       enabled: false            # if false, the conroller is disabled after launching the node (recommended); you can enable it with a service/topic
       verbose: false
 

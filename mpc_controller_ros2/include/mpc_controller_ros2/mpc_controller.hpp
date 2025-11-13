@@ -66,20 +66,12 @@ private:
   void escStatusCallback(px4_msgs::msg::EscStatus::UniquePtr msg);
   void enableControllerCallback(const std_msgs::msg::Bool::SharedPtr msg);
 
-  // Service callbacks
-  void enableControllerService(
-      const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
-      std::shared_ptr<std_srvs::srv::Trigger::Response> response);
-  void disableControllerService(
-      const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
-      std::shared_ptr<std_srvs::srv::Trigger::Response> response);
-
   // Helper methods
   void publishRateCommand(double thrust, double wx, double wy, double wz);
   void publishTorqueCommand(double thrust, double tau_x, double tau_y,
                             double tau_z);
   void publishMotorCommand(const std::vector<double> &motor_commands);
-  void publishIdleCommand();
+  void publishUnifiedCommand(const float thrust_cmd);
   void predictState(std::vector<double> &predicted_state, double dt);
   std::vector<double> runIndiController(double mpc_thrust,
                                         const Eigen::Vector3d &mpc_torques);
@@ -106,10 +98,6 @@ private:
       thrust_pub_;
   rclcpp::Publisher<px4_msgs::msg::ActuatorMotors>::SharedPtr motors_pub_;
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr trajectory_pub_;
-
-  // Service servers
-  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr enable_service_;
-  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr disable_service_;
 
   // timers
   rclcpp::TimerBase::SharedPtr mpc_timer_;
@@ -142,6 +130,10 @@ private:
   double rate_max_xy_, rate_max_z_, torque_max_xy_, torque_max_z_;
   std::vector<double> Q_rate_diag_, R_rate_diag_;
   std::vector<double> Q_torque_diag_, R_torque_diag_;
+
+  // idle state after arming
+  bool idle_ = false;
+  double thrust_cmd_ = 0.0;
 
   // Thread-safe state (shared between ROS callbacks, MPC, and INDI loops)
   std::mutex state_mutex_;

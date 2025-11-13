@@ -84,17 +84,6 @@ MpcController::MpcController(const rclcpp::NodeOptions &options)
   trajectory_pub_ =
       this->create_publisher<nav_msgs::msg::Path>("~/mpc_trajectory", qos);
 
-  // Add service servers (after publishers are created)
-  enable_service_ = this->create_service<std_srvs::srv::Trigger>(
-      "~/enable_controller",
-      std::bind(&MpcController::enableControllerService, this,
-                std::placeholders::_1, std::placeholders::_2));
-
-  disable_service_ = this->create_service<std_srvs::srv::Trigger>(
-      "~/disable_controller",
-      std::bind(&MpcController::disableControllerService, this,
-                std::placeholders::_1, std::placeholders::_2));
-
   // Timer for the MPC outer loop
   mpc_timer_ = this->create_wall_timer(
       std::chrono::milliseconds(static_cast<int>(1000.0 / control_freq_)),
@@ -172,6 +161,15 @@ void MpcController::enableControllerCallback(
         controller_enabled_ = true;
         last_indi_run_time_ = this->get_clock()->now();
         should_start_logging = enable_logging_;
+        {
+          std::lock_guard<std::mutex> lock(x_init_mutex_);
+          x_init_.clear();
+        }
+        {
+          std::lock_guard<std::mutex> lock(trajectory_mutex_);
+          trajectory_received_ = false;
+          ref_trajectory_.clear();
+        }
       }
     } else {
       if (controller_enabled_) {
@@ -182,88 +180,11 @@ void MpcController::enableControllerCallback(
     }
   }
 
-  if (msg->data) {
-    {
-      std::lock_guard<std::mutex> lock(x_init_mutex_);
-      x_init_.clear();
-    }
-    {
-      std::lock_guard<std::mutex> lock(trajectory_mutex_);
-      trajectory_received_ = false;
-      ref_trajectory_.clear();
-    }
-  }
-
   if (msg->data && should_start_logging && trajectory_logger_) {
     trajectory_logger_->startNewLog();
     RCLCPP_INFO(this->get_logger(), "Started new log file: %s",
                 trajectory_logger_->getCurrentLogPath().c_str());
   } else if (!msg->data && enable_logging_ && trajectory_logger_) {
-    trajectory_logger_->stopLogging();
-    RCLCPP_INFO(this->get_logger(), "Stopped logging");
-  }
-}
-
-void MpcController::enableControllerService(
-    const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
-    std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
-  (void)request; // Unused parameter
-
-  bool should_start_logging = false;
-
-  {
-    std::lock_guard<std::mutex> lock(controller_enabled_mutex_);
-    controller_enabled_ = true;
-
-    // Reset controller state for smooth startup
-    solver_->reset();
-    solver_failure_count_ = 0;
-    last_indi_run_time_ = this->get_clock()->now();
-    should_start_logging = enable_logging_;
-  } // Mutex released here
-
-  {
-    std::lock_guard<std::mutex> lock(x_init_mutex_);
-    x_init_.clear();
-  }
-
-  {
-    std::lock_guard<std::mutex> lock(trajectory_mutex_);
-    trajectory_received_ = false;
-    ref_trajectory_.clear();
-  }
-
-  response->success = true;
-  response->message = "Controller enabled successfully";
-  RCLCPP_INFO(this->get_logger(), "Controller ENABLED via service");
-
-  // Start logging OUTSIDE the mutex lock
-  if (should_start_logging && trajectory_logger_) {
-    trajectory_logger_->startNewLog();
-    RCLCPP_INFO(this->get_logger(), "Started new log file: %s",
-                trajectory_logger_->getCurrentLogPath().c_str());
-  }
-}
-
-void MpcController::disableControllerService(
-    const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
-    std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
-  (void)request; // Unused parameter
-
-  bool should_stop_logging = false;
-
-  {
-    std::lock_guard<std::mutex> lock(controller_enabled_mutex_);
-    controller_enabled_ = false;
-    should_stop_logging = enable_logging_;
-  } // Mutex released here
-
-  response->success = true;
-  response->message = "Controller disabled successfully";
-  RCLCPP_WARN(this->get_logger(), "Controller DISABLED via service");
-
-  // Stop logging OUTSIDE the mutex lock
-  if (should_stop_logging && trajectory_logger_) {
     trajectory_logger_->stopLogging();
     RCLCPP_INFO(this->get_logger(), "Stopped logging");
   }
@@ -546,9 +467,8 @@ void MpcController::escStatusCallback(px4_msgs::msg::EscStatus::UniquePtr msg) {
   }
 }
 
-void MpcController::publishIdleCommand() {
-  // Use 5% normalized thrust/throttle for idle
-  const float idle_normalized_value = 0.01f;
+void MpcController::publishUnifiedCommand(const float thrust_cmd) {
+
   uint64_t timestamp = this->get_clock()->now().nanoseconds() / 1000;
 
   if (controller_type_ == "RATE") {
@@ -561,7 +481,7 @@ void MpcController::publishIdleCommand() {
     msg->thrust_body[0] = 0.0f;
     msg->thrust_body[1] = 0.0f;
     // PX4 expects negative for upward thrust, [0, 1] normalized
-    msg->thrust_body[2] = -idle_normalized_value;
+    msg->thrust_body[2] = -thrust_cmd;
     rates_pub_->publish(std::move(msg));
 
   } else if (controller_type_ == "TORQUE") {
@@ -578,7 +498,7 @@ void MpcController::publishIdleCommand() {
       thrust_msg->xyz[0] = 0.0f;
       thrust_msg->xyz[1] = 0.0f;
       // PX4 expects negative for upward thrust, [0, 1] normalized
-      thrust_msg->xyz[2] = -idle_normalized_value;
+      thrust_msg->xyz[2] = -thrust_cmd;
       thrust_pub_->publish(std::move(thrust_msg));
 
       // 2. Torque message
@@ -601,7 +521,7 @@ void MpcController::publishIdleCommand() {
 
       // Set first 4 motors to idle value
       for (size_t i = 0; i < 4; ++i) {
-        msg->control[i] = idle_normalized_value;
+        msg->control[i] = thrust_cmd;
       }
 
       // Set unused motors to NaN (PX4 convention)
@@ -1083,7 +1003,8 @@ void MpcController::mpcControlLoop() {
       // if we are still on the ground (less then 15 cm) without any takeoff
       // trajectory yet, publish idle command
       if (x_current_local[2] <= 0.15) {
-        publishIdleCommand();
+        publishUnifiedCommand(0.01);
+        idle_ = true;
         return;
       }
       std::lock_guard<std::mutex> lock(x_init_mutex_);
@@ -1109,6 +1030,16 @@ void MpcController::mpcControlLoop() {
 
       terminal_reference = horizon_references.back();
     }
+  }
+
+  if (idle_ == true) {
+    // take current thrust command and ramp it up
+    thrust_cmd_ = thrust_cmd_ + 0.004 * control_freq_ / 100;
+    publishUnifiedCommand(thrust_cmd_);
+    if (thrust_cmd_ >= mass_ * 9.81 / thrust_max_) {
+      idle_ = false;
+    }
+    return;
   }
 
   for (int i = 0; i < n_; ++i) {
