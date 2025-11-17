@@ -1003,7 +1003,8 @@ void MpcController::mpcControlLoop() {
       // if we are still on the ground (less then 15 cm) without any takeoff
       // trajectory yet, publish idle command
       if (x_current_local[2] <= 0.15) {
-        publishUnifiedCommand(0.01);
+        thrust_cmd_ = 0.01;
+        publishUnifiedCommand(thrust_cmd_);
         idle_ = true;
         return;
       }
