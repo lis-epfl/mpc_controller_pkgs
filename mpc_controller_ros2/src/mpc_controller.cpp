@@ -1035,7 +1035,7 @@ void MpcController::mpcControlLoop() {
 
   if (idle_ == true) {
     // take current thrust command and ramp it up
-    thrust_cmd_ = thrust_cmd_ + 0.004 * control_freq_ / 100;
+    thrust_cmd_ = thrust_cmd_ + 0.008 * control_freq_ / 100;
     publishUnifiedCommand(thrust_cmd_);
     if (thrust_cmd_ >= mass_ * 9.81 / thrust_max_) {
       idle_ = false;
