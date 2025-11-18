@@ -843,10 +843,10 @@ void MpcController::trajectoryCallback(
     // Update t_0 to the new start time
     t_0 = current_time_sec - (num_steps_back * dt);
 
-    RCLCPP_INFO(
-        this->get_logger(),
-        "Added %d extrapolated states before trajectory start. New t_0: %.3f",
-        num_steps_back, t_0);
+    /* RCLCPP_INFO( */
+    /*     this->get_logger(), */
+    /*     "Added %d extrapolated states before trajectory start. New t_0: %.3f", */
+    /*     num_steps_back, t_0); */
 
     // Add extrapolated states to the beginning
     for (const auto &state : extra_states) {
