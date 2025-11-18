@@ -130,6 +130,13 @@ private:
   double rate_max_xy_, rate_max_z_, torque_max_xy_, torque_max_z_;
   std::vector<double> Q_rate_diag_, R_rate_diag_;
   std::vector<double> Q_torque_diag_, R_torque_diag_;
+  // Scale compensation parameters
+  double command_scale_min_;
+  double command_scale_max_;
+  double command_scale_gain_;
+
+  // Dynamic scale factor (atomic for thread safety between MPC and INDI loops)
+  std::atomic<double> command_scale_{1.0};
 
   // idle state after arming
   bool idle_ = false;

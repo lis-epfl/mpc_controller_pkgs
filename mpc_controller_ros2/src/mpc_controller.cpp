@@ -290,6 +290,10 @@ void MpcController::declareAndLoadParams() {
                           0.0, 0.01, 0.01, 0.01});
   this->declare_parameter<std::vector<double>>(
       "mpc.R_torque_diag", std::vector<double>{0.1, 0.05, 0.05, 0.02});
+  this->declare_parameter<double>("mpc.command_scale_min", 0.8);
+  this->declare_parameter<double>("mpc.command_scale_max", 1.2);
+  this->declare_parameter<double>("mpc.command_scale_gain",
+                                  0.0); // Default 0 to disable if not tuned
 
   // Topic configuration - only trajectory is configurable
   this->declare_parameter<std::string>("topics.trajectory",
@@ -362,6 +366,10 @@ void MpcController::declareAndLoadParams() {
                                                 0.0, 0.0, 0.0, -1.0};
   this->declare_parameter<std::vector<double>>("drone.gyro_transform_matrix",
                                                default_gyro_transform);
+
+  this->get_parameter("mpc.command_scale_min", command_scale_min_);
+  this->get_parameter("mpc.command_scale_max", command_scale_max_);
+  this->get_parameter("mpc.command_scale_gain", command_scale_gain_);
 
   std::vector<double> gyro_transform_vec;
   this->get_parameter("drone.gyro_transform_matrix", gyro_transform_vec);
@@ -550,7 +558,8 @@ void MpcController::publishRateCommand(double thrust, double wx, double wy,
   double normalized_thrust = thrust / 4;
   normalized_thrust =
       sqrt(normalized_thrust / thrust_coeff_) / max_rotor_speed_rad_s_;
-  normalized_thrust = std::clamp(normalized_thrust, -1.0, 1.0);
+  normalized_thrust =
+      std::clamp(normalized_thrust* command_scale_.load(), -1.0, 1.0);
 
   // PX4 expects thrust in body z-axis (downward in NED)
   msg->thrust_body[0] = 0.0;
@@ -572,7 +581,8 @@ void MpcController::publishTorqueCommand(double thrust, double tau_x,
   double normalized_thrust = thrust / 4;
   normalized_thrust =
       sqrt(normalized_thrust / thrust_coeff_) / max_rotor_speed_rad_s_;
-  normalized_thrust = std::clamp(normalized_thrust, -1.0, 1.0);
+  normalized_thrust =
+      std::clamp(normalized_thrust * command_scale_.load(), -1.0, 1.0);
 
   thrust_msg->xyz[0] = 0.0;
   thrust_msg->xyz[1] = 0.0;
@@ -605,7 +615,7 @@ void MpcController::publishMotorCommand(
     // Normalize based on max rotor speed
     float normalized =
         static_cast<float>(motor_commands[i] / max_rotor_speed_rad_s_);
-    normalized = std::clamp(normalized, 0.0f, 1.0f);
+    normalized = std::clamp(normalized * command_scale_.load(), 0.0, 1.0);
     msg->control[i] = normalized;
   }
 
@@ -1006,6 +1016,7 @@ void MpcController::mpcControlLoop() {
         thrust_cmd_ = 0.01;
         publishUnifiedCommand(thrust_cmd_);
         idle_ = true;
+        command_scale_.store(1.0);
         return;
       }
       std::lock_guard<std::mutex> lock(x_init_mutex_);
@@ -1035,13 +1046,21 @@ void MpcController::mpcControlLoop() {
 
   if (idle_ == true) {
     // take current thrust command and ramp it up
-    thrust_cmd_ = thrust_cmd_ + 0.006 * control_freq_ / 100;
+    thrust_cmd_ = thrust_cmd_ + 0.008 * control_freq_ / 100;
     publishUnifiedCommand(thrust_cmd_);
     if (thrust_cmd_ >= mass_ * 9.81 / thrust_max_) {
       idle_ = false;
     }
     return;
   }
+
+  // update scale
+  double dt = 1 / control_freq_;
+  double z_error = horizon_references[0][2] - x_current_local[2];
+  double current_scale = command_scale_.load();
+  current_scale += dt * command_scale_gain_ * z_error;
+  current_scale = std::clamp(current_scale, command_scale_min_, command_scale_max_);
+  command_scale_.store(current_scale);
 
   for (int i = 0; i < n_; ++i) {
     std::vector<double> yref(solver_->getNy(), 0.0);
