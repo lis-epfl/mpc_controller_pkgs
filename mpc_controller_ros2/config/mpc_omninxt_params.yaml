@@ -80,7 +80,7 @@
       # scale the command to compensate for voltage drop/variation
       command_scale_min: 0.8
       command_scale_max: 1.2
-      command_scale_gain: 1.0
+      command_scale_gain: 0.5
 
     # INDI Configuration (only used when controller.type = "TORQUE")
     indi:
