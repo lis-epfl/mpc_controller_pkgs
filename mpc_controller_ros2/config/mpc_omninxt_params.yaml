@@ -33,7 +33,7 @@
 
       # Control limits
       thrust_min: 0.1           # Minimum thrust (N)
-      thrust_max: 21.27         # Maximum thrust (N) - calibrated from hover test at 0.725 command
+      thrust_max: 18.46         # Maximum thrust (N) - calibrated from hover test at 0.725 command
       rate_max_xy: 20.0         # Maximum roll/pitch rate (rad/s) - reduced from 20.0 for safety
       rate_max_z: 2.0           # Maximum yaw rate (rad/s) - increased from 1.0 based on capability
       torque_max_xy: 20.0        # Maximum roll/pitch torque (N*m) - 2 × (27.93/4) × 0.246
@@ -43,8 +43,8 @@
       arm_length: 0.0756         # Distance from center to motor (m) 
       arm_angle_deg: 45.0       # Angle between arms (degrees)
       rotor_inertia: 1.0e-07  # Rotor inertia Izz (kg*m^2) from rotor link
-      thrust_coefficient: 4.5e-07          # Effective thrust coefficient 
-      torque_coefficient: 2.4e-08         # Torque coefficient
+      thrust_coefficient: 5.0e-07          # Effective thrust coefficient 
+      torque_coefficient: 2.5e-08         # Torque coefficient
       max_rotor_rpm: 45000.0     # Maximum rotor speed in rpm 
       esc_scale: 0.01        # ESC rpm measurements are multiplied by rpm to rad/s constant and by this scale as well because simulation doesn't return rpm, but rad/s, so we compensate the rpm to rad/s constant with with scale
 
