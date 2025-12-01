@@ -70,6 +70,10 @@ void TrajectoryLogger::startNewLog() {
   horizon_file_ << "thrust,u1,u2,u3,";
   horizon_file_ << "ref_x,ref_y,ref_z,ref_vx,ref_vy,ref_vz,ref_qw,ref_qx,ref_qy,ref_qz,ref_wx,ref_wy,ref_wz\n";  // Added ref_wx,ref_wy,ref_wz
 
+  // Open computation time log file
+  computation_time_file_.open(current_log_path_ + "/computation_times.csv");
+  computation_time_file_ << "timestamp,computation_time_ms\n";
+
   is_logging_ = true;
 
   // Create/update the "latest" symlink
@@ -84,6 +88,9 @@ void TrajectoryLogger::stopLogging() {
   }
   if (horizon_file_.is_open()) {
     horizon_file_.close();
+  }
+  if (computation_time_file_.is_open()) {
+    computation_time_file_.close();
   }
 
   is_logging_ = false;
@@ -209,6 +216,18 @@ void TrajectoryLogger::logMPCHorizon(
     horizon_file_ << "\n";
   }
   horizon_file_.flush();
+}
+
+void TrajectoryLogger::logComputationTime(double timestamp, double computation_time_ms) {
+  std::lock_guard<std::mutex> lock(mutex_);
+
+  if (!is_logging_ || !computation_time_file_.is_open()) {
+    return;
+  }
+
+  computation_time_file_ << std::fixed << std::setprecision(6) << timestamp << ","
+                         << computation_time_ms << "\n";
+  computation_time_file_.flush();
 }
 
 } // namespace mpc_controller_ros2

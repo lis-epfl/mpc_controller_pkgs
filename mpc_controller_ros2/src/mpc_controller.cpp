@@ -1185,6 +1185,11 @@ void MpcController::mpcControlLoop() {
       std::chrono::duration<double, std::milli>(end_time - start_time).count();
   computation_times_ms_.push_back(comp_time_ms);
 
+  // Log computation time
+  if (enable_logging_) {
+    trajectory_logger_->logComputationTime(this->get_clock()->now().seconds(), comp_time_ms);
+  }
+
   // Publish command based on controller type
   if (controller_type_ == "RATE") {
     publishRateCommand(u_current[0], u_current[1], u_current[2], u_current[3]);

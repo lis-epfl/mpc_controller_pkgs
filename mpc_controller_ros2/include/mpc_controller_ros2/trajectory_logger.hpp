@@ -27,6 +27,8 @@ public:
                      const std::vector<std::vector<double>> &predicted_controls,
                      const std::vector<std::vector<double>> &reference_states);
 
+  void logComputationTime(double timestamp, double computation_time_ms);
+
   std::string getCurrentLogPath() const;
 
 private:
@@ -39,6 +41,7 @@ private:
 
   std::ofstream state_file_;
   std::ofstream horizon_file_;
+  std::ofstream computation_time_file_;
 
   std::mutex mutex_;
   bool is_logging_;
