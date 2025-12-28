@@ -65,7 +65,7 @@
                     1.0, 1.0, 1.0, 1.0]      # Quaternion weights
 
       # Control weights: [thrust, wx, wy, wz]
-      R_rate_diag: [0.1, 0.3, 0.3, 0.3]
+      R_rate_diag: [0.1, 0.35, 0.35, 0.35]
 
       # Cost matrices for TORQUE controller
       # State weights: [px, py, pz, vx, vy, vz, qw, qx, qy, qz, wx, wy, wz]
